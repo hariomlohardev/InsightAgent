@@ -98,13 +98,28 @@ async def process_query(dataset_id: str, query: str, conversation_id: str = None
         "stdout": exec_res.get("stdout"),
     }
 
-# Fix: better wrapper that handles conversation_id correctly - L4 adds connector sql detection
+# BF-03 chat cache <5ms HIT via chat:{id}:{qhash}:{version}
 async def process_query_v2(dataset_id: str, query: str, conversation_id: str = None) -> Dict[str, Any]:
     from app.core import storage as st
-    import uuid
+    import uuid, hashlib, time
+    try:
+        from app.core.cache import get as cache_get, set as cache_set, cache_key
+        _cache_available = True
+    except Exception:
+        _cache_available = False
     # L4: if dataset is connector, force intent to sql even if query is NL (so coder can try NL→SQL)
     meta = st.get_dataset_meta(dataset_id)
     is_connector = meta and meta.get("type") == "connector"
+    # BF-03 check cache before compute
+    _version = meta.get("current_version", 0) if meta else 0
+    _qhash = hashlib.sha256(query.strip().encode()).hexdigest()[:12] if _cache_available else ""
+    _ck = cache_key(f"chat:{dataset_id}:{_qhash}:{_version}") if _cache_available else None
+    if _cache_available and _ck:
+        _cached = cache_get(_ck)
+        if _cached and isinstance(_cached, dict) and _cached.get("query") == query:
+            # bump hit marker for API layer
+            _cached["_cache_hit"] = True
+            return _cached
     df = st.load_dataset_df(dataset_id)
     profile = profile_dataframe(df)
     if is_connector and not query.strip().lower().startswith(("select","with")):
@@ -170,7 +185,7 @@ async def process_query_v2(dataset_id: str, query: str, conversation_id: str = N
     }
     st.save_conversation_message(dataset_id, conversation_id, "assistant", assistant_content)
 
-    return {
+    _result = {
         "conversation_id": conversation_id,
         "query": query,
         "intent": intent,
@@ -184,3 +199,10 @@ async def process_query_v2(dataset_id: str, query: str, conversation_id: str = N
         "stdout": exec_res.get("stdout"),
         "diff": diff,
     }
+    # BF-03 set cache for next HIT <5ms
+    if _cache_available and _ck:
+        try:
+            cache_set(_ck, _result, ttl=60)
+        except Exception:
+            pass
+    return _result

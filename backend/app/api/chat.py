@@ -89,21 +89,12 @@ async def chat(req: ChatRequest, request: Request = None, user: Dict[str, Any] =
         traceback.print_exc()
         pass
     try:
-        try:
-            from app.core.cache import get as cache_get, set as cache_set, cache_key
-            ck = cache_key("chat", req.dataset_id, str(meta.get("current_version",0)), str(hash(req.query)))
-            cached = cache_get(ck)
-            if cached and isinstance(cached, dict) and cached.get("success"):
-                pass
-        except:
-            pass
         result = await process_query_v2(req.dataset_id, req.query, req.conversation_id)
-        try:
-            from app.core.cache import set as cache_set, cache_key
-            ck = cache_key("chat", req.dataset_id, str(meta.get("current_version",0)), str(hash(req.query)))
-            cache_set(ck, result, ttl=60)
-        except:
-            pass
+        # BF-03 X-Cache header for HIT <5ms
+        _is_hit = result.pop("_cache_hit", None) if isinstance(result, dict) else None
+        if _is_hit:
+            from fastapi.responses import JSONResponse
+            return JSONResponse(content=ChatResponse(**result).model_dump(), headers={"X-Cache": "HIT"})
         try:
             if os.getenv("CLOUD","false").lower() in ("true","1","yes"):
                 from app.core.billing import increment_query
