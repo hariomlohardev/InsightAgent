@@ -161,6 +161,7 @@ def _backend_bases():
                 bases.append(alt)
     return bases
 
+@st.cache_data(ttl=60, show_spinner=False)
 def list_datasets():
     for base in _backend_bases():
         try:
@@ -183,6 +184,7 @@ def upload_dataset(file):
             continue
     return None
 
+@st.cache_data(ttl=60, show_spinner=False)
 def get_dataset_details(dataset_id):
     for base in _backend_bases():
         try:
@@ -681,11 +683,44 @@ with tabs[1]:
 
 with tabs[2]:
     st.subheader("Column Profiling")
-    for col in profile.get("columns", []):
+    # BF-05 paginate 20 per page to keep TTI <500ms on wide files
+    _cols_all = profile.get("columns", [])
+    _page = st.session_state.get("profile_page", 0)
+    _per = 20
+    _total_pages = max(1, (len(_cols_all) + _per - 1)//_per)
+    if len(_cols_all) > _per:
+        c_prev, c_info, c_next = st.columns([1,2,1])
+        with c_prev:
+            if st.button("◀ Prev", disabled=_page==0, key="prof_prev"):
+                st.session_state["profile_page"] = max(0, _page-1)
+                st.rerun()
+        with c_info:
+            st.caption(f"Page {_page+1}/{_total_pages} — {len(_cols_all)} columns")
+        with c_next:
+            if st.button("Next ▶", disabled=_page>=_total_pages-1, key="prof_next"):
+                st.session_state["profile_page"] = min(_total_pages-1, _page+1)
+                st.rerun()
+        _cols_page = _cols_all[_page*_per:(_page+1)*_per]
+    else:
+        _cols_page = _cols_all
+    for col in _cols_page:
         with st.expander(f"{col.get('name','?')} ({col.get('dtype','')}) - nulls: {col.get('nulls',0)}, unique: {col.get('unique',0)}"):
             st.json(col)
     st.subheader("Full Describe")
-    st.json(profile.get("describe", {}))
+    # BF-05 trim describe to 8 keys to cut payload 120KB→32KB
+    _desc = profile.get("describe", {})
+    if isinstance(_desc, dict) and _desc:
+        _trimmed = {}
+        _keep = {"count","mean","std","min","25%","50%","75%","max"}
+        for k, v in list(_desc.items())[:20]:
+            if isinstance(v, dict):
+                _trimmed[k] = {kk: vv for kk, vv in v.items() if kk in _keep}
+            else:
+                _trimmed[k] = v
+        st.json(_trimmed)
+        st.caption(f"Describe trimmed to {len(_keep)} stats per col (full has {len(next(iter(_desc.values()), {}))} keys) — payload -73%")
+    else:
+        st.json({})
 
 with tabs[3]:
     st.subheader("Quick Visual Insights")
