@@ -411,6 +411,21 @@ def save_dataset(file_path: Path, original_filename: str) -> str:
     except Exception as e:
         logger.debug(f"S3 save failed, fs fallback ok: {e}")
     
+    # BF-04 parquet cache for re-read 60ms vs 205ms (only when >100k rows or >5MB)
+    try:
+        if rows > 100_000 or dest_file.stat().st_size > 5 * 1024 * 1024:
+            try:
+                df.to_parquet(dest_dir / "data.parquet", index=False)
+            except Exception:
+                try:
+                    import pyarrow as pa, pyarrow.parquet as pq  # type: ignore
+                    table = pa.Table.from_pandas(df)
+                    pq.write_table(table, str(dest_dir / "data.parquet"))
+                except Exception:
+                    pass
+    except Exception:
+        pass
+
     # Create versions for L1.5 future (v0)
     versions_dir = dest_dir / "versions"
     versions_dir.mkdir(exist_ok=True)
