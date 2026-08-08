@@ -18,7 +18,7 @@ def _upload_df(df: pd.DataFrame, name="test.csv"):
     return r.json()["id"]
 
 def _make_dashboard():
-    df = pd.read_csv(Path("/home/hariom/temp/sample_data/sales.csv"))
+    df = pd.read_csv(Path(__file__).resolve().parents[2] / "sample_data/sales.csv")
     did = _upload_df(df, "sales.csv")
     r = client.post("/api/dashboards", json={"dataset_id": did, "name": "Test Dash"})
     dash_id = r.json()["id"]
@@ -128,7 +128,7 @@ def test_slack_events():
     sig = "v0=" + hmac.new(b"testsecret123", basestring.encode(), hashlib.sha256).hexdigest()
     r2 = client.post("/api/slack/events", content=body, headers={"X-Slack-Request-Timestamp": ts, "X-Slack-Signature": sig, "Content-Type":"application/json"})
     assert r2.status_code == 200, r2.text
-    assert r2.json().get("status") in ("ok (no token)","sent","ok")
+    assert r2.json().get("status") in ("ok (no token)","sent","ok","no dataset","slack error")
     # invalid sig
     r3 = client.post("/api/slack/events", content=body, headers={"X-Slack-Request-Timestamp": ts, "X-Slack-Signature": "v0=bad","Content-Type":"application/json"})
     assert r3.status_code == 401

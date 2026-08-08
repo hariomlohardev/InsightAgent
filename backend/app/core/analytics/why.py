@@ -92,9 +92,13 @@ def analyze_why(df: pd.DataFrame, profile: Dict[str, Any], query: str) -> pd.Dat
 
     # Find dimension to segment by: prefer categorical with moderate cardinality
     cat_cols = profile.get("categorical_columns", [])
-    # If no cat_cols, fallback to any non-numeric
+    # Exclude datetime columns from segment candidates
+    _inferred = profile.get("inferred_roles", {})
+    _date_col_name = (date_col or "").lower()
+    cat_cols = [c for c in cat_cols if _inferred.get(c) != "datetime" and c.lower() != _date_col_name and "date" not in c.lower() and "time" not in c.lower()]
+    # If no cat_cols after filtering, fallback to any non-numeric non-datetime
     if not cat_cols:
-        cat_cols = [c for c in df.columns if c != metric and df[c].dtype == object]
+        cat_cols = [c for c in df.columns if c != metric and df[c].dtype == object and c != date_col and "date" not in c.lower()]
     if not cat_cols:
         # fallback to first column not metric
         for c in df.columns:

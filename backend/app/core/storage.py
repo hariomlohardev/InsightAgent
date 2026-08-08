@@ -10,7 +10,7 @@ import pandas as pd
 import logging
 logger = logging.getLogger(__name__)
 
-from app.config import get_storage_path
+from app.config import get_storage_path, get_workspace_id, is_cloud
 
 # L09 DB dual-path helpers (graceful fallback when no DATABASE_URL)
 try:
@@ -108,17 +108,27 @@ def _db_list_metas() -> List[Dict[str, Any]] | None:
             return None
         with sm() as s:
             from sqlalchemy import select
-            # order by created_at desc
+            # workspace filter when CLOUD=true
+            ws = get_workspace_id() if is_cloud() else None
             try:
-                stmt = select(DatasetRow).order_by(DatasetRow.created_at.desc())
+                if ws and ws != "default":
+                    stmt = select(DatasetRow).where(DatasetRow.workspace_id == ws).order_by(DatasetRow.created_at.desc())
+                else:
+                    # when CLOUD true but ws default, still filter by workspace_id to isolate default
+                    if is_cloud():
+                        stmt = select(DatasetRow).where(DatasetRow.workspace_id == ws).order_by(DatasetRow.created_at.desc())
+                    else:
+                        stmt = select(DatasetRow).order_by(DatasetRow.created_at.desc())
                 rows = s.execute(stmt).scalars().all()
             except Exception:
-                rows = s.query(DatasetRow).order_by(DatasetRow.created_at.desc()).all()  # type: ignore
+                # fallback query api
+                q = s.query(DatasetRow)  # type: ignore
+                if is_cloud():
+                    q = q.filter(DatasetRow.workspace_id == get_workspace_id())
+                rows = q.order_by(DatasetRow.created_at.desc()).all()  # type: ignore
             out = []
             for r in rows:
-                # prefer stored meta_json, else reconstruct
                 if r.meta_json:
-                    # ensure workspace_id consistent
                     out.append(r.meta_json)
                 else:
                     out.append({
@@ -129,6 +139,7 @@ def _db_list_metas() -> List[Dict[str, Any]] | None:
                         "column_names": r.column_names,
                         "created_at": r.created_at.isoformat() if r.created_at else "",
                         "owner": r.owner,
+                        "workspace_id": r.workspace_id,
                     })
             return out
     except Exception as e:
@@ -145,14 +156,26 @@ def _db_get_meta(dataset_id: str) -> Dict[str, Any] | None:
             return None
         with sm() as s:
             from sqlalchemy import select
+            # Enforce workspace isolation when CLOUD=true
+            ws = get_workspace_id() if is_cloud() else None
             try:
-                stmt = select(DatasetRow).where(DatasetRow.id == dataset_id)
+                if is_cloud():
+                    stmt = select(DatasetRow).where((DatasetRow.id == dataset_id) & (DatasetRow.workspace_id == ws))
+                else:
+                    stmt = select(DatasetRow).where(DatasetRow.id == dataset_id)
                 row = s.execute(stmt).scalar_one_or_none()
             except Exception:
-                row = s.query(DatasetRow).filter_by(id=dataset_id).first()  # type: ignore
-            if row and row.meta_json:
-                return row.meta_json
+                # fallback with workspace filter
+                q = s.query(DatasetRow).filter_by(id=dataset_id)  # type: ignore
+                if is_cloud():
+                    q = q.filter_by(workspace_id=ws)
+                row = q.first()  # type: ignore
             if row:
+                # Enforce workspace check even for fallback
+                if is_cloud() and row.workspace_id != ws:
+                    return None
+                if row.meta_json:
+                    return row.meta_json
                 return {
                     "id": row.id,
                     "original_filename": row.original_filename,
@@ -161,6 +184,7 @@ def _db_get_meta(dataset_id: str) -> Dict[str, Any] | None:
                     "column_names": row.column_names,
                     "created_at": row.created_at.isoformat() if row.created_at else "",
                     "owner": row.owner,
+                    "workspace_id": row.workspace_id,
                 }
             return None
     except Exception as e:
@@ -346,6 +370,7 @@ def save_dataset(file_path: Path, original_filename: str) -> str:
         "file_path": str(dest_file),
         "current_version": 0,
         "type": "file",
+        "workspace_id": get_workspace_id() if is_cloud() else "default",
     }
     _atomic_write_json(dest_dir / "meta.json", meta)
     

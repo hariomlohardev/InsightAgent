@@ -757,6 +757,10 @@ async def generate_code(query: str, profile: Dict[str, Any], intent: Dict[str, A
         # For raw SQL, directly craft duckdb code (fallback_coder already does but we short-circuit to avoid LLM)
         # Use fallback to keep logic consistent
         return fallback_coder(query, profile)
+    # Deterministic analytics / why / outlier / forecast / segment / what-if must bypass LLM even when key present (tests + quality)
+    _q_analytic = q_lower
+    if any(k in _q_analytic for k in ["outlier", "anomal", "why ", "why?", "explain", "forecast", "predict", "segment by", "cohort by", "breakdown by", "what if", "what-if", "correlation", "heatmap"]) or any(w in _q_analytic for w in ["why did", "why sales"]):
+        return fallback_coder(query, profile)
     # L4/L5: handle analytics intent via fallback (analytics branches are inside fallback_coder)
     if intent.get("intent") == "analytics":
         return fallback_coder(query, profile)

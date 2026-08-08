@@ -173,7 +173,7 @@ def test_queue_sync_fallback_without_redis():
             login_admin = c2.post("/api/auth/login", json={"email":"admin@local","password":"admin"})
         tok = login_admin.json()["access_token"]
         ah = _auth_headers(tok)
-        df = pd.read_csv(Path("/home/hariom/temp/sample_data/sales.csv"))
+        df = pd.read_csv(Path(__file__).resolve().parents[2] / "sample_data/sales.csv")
         with tempfile.NamedTemporaryFile(suffix=".csv", delete=False, mode="w") as tmp:
             df.to_csv(tmp.name, index=False)
             p = Path(tmp.name)
