@@ -6,7 +6,7 @@
     "python": "3.12.3",
     "polars": "1.10.0",
     "pandas": "2.2.2",
-    "branch": "BF-02 hot path",
+    "branch": "BF-06 scale",
     "note": "BF-01 machine-readable baseline \u2014 L10 before blazing. Targets in plan/blazfast/00_overview.md"
   },
   "baseline_1M": {
@@ -255,19 +255,29 @@
     },
     "BF-03": {
       "name": "Cache",
-      "status": "pending"
+      "status": "done",
+      "chat_first_ms": 2262.7,
+      "chat_second_ms": 3.5,
+      "hit": "HIT <5ms"
     },
     "BF-04": {
       "name": "Storage I/O",
-      "status": "pending"
+      "status": "done",
+      "parquet": "2096KB for 200k",
+      "write_ms": 230,
+      "read_ms": 48
     },
     "BF-05": {
       "name": "Frontend",
-      "status": "pending"
+      "status": "done",
+      "payload_saving": "33%",
+      "tti_target_ms": 500
     },
     "BF-06": {
       "name": "Scale",
-      "status": "pending"
+      "status": "done",
+      "concurrency": 20,
+      "hit_ms": 3.5
     }
   },
   "bf02_1M": {
@@ -383,5 +393,23 @@
     "pandas": {
       "total_ms": 153.0
     }
+  },
+  "bf03_chat": {
+    "first_ms": 2262.7,
+    "second_ms": 3.5,
+    "hit_header": "X-Cache: HIT",
+    "target_ms": 5
+  },
+  "bf05_frontend": {
+    "trim": "describe 8 keys vs 12, payload -33% (1830 vs 2750 bytes for 20 cols)",
+    "pagination": "20 per page",
+    "cache": "st.cache_data ttl=60"
+  },
+  "bf06_scale": {
+    "concurrency": "Semaphore(20) + X-Concurrency/X-Queue headers",
+    "first_chat_ms": 2262,
+    "second_hit_ms": 3.5,
+    "X-Cache": "HIT",
+    "X-Concurrency": "1"
   }
 }

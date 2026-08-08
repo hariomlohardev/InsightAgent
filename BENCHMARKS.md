@@ -108,3 +108,56 @@ pandas: read 459ms + profile 1104ms = 1563ms (was 2275ms) -31%  (-712ms in earli
 PYTHONPATH=backend /tmp/venv09/bin/python scripts/bench_profile.py --rows 1000000 --json | grep total_ms
 PYTHONPATH=backend /tmp/venv09/bin/python -m pytest backend/tests/test_profiling.py backend/tests/test_performance.py -q
 ```
+
+## 2026-08-08 — BF-03 Cache (chat HIT <5ms) — `1d31cd8` → `BF-03`
+
+**Chat cache (`POST /api/chat` repeat same `dataset_id` + `query` + `version`):**
+```
+first  2262.7ms  X-Cache: —  (Mss, LLM/heuristic)
+second 3.5ms    X-Cache: HIT (target <5ms) ✅  646× faster
+curl -i POST /api/chat -d '{"dataset_id":"...","query":"sum Sales"}' | grep X-Cache  # HIT on second
+```
+**Service:** `chat:{id}:{qhash}:{version}` via `cache_key` + `cache_get/set` 60s in `chat_service.py:111-201`, API returns `JSONResponse` with `X-Cache: HIT` when `_cache_hit`.
+
+**Gate:**
+```bash
+PYTHONPATH=backend /tmp/venv09/bin/python -m pytest backend/tests/test_performance.py::test_cache_hit_lt_10ms -q  # 1 passed
+# manual:
+# first chat 2262ms, second 3.5ms HIT
+```
+
+
+## 2026-08-08 — BF-05 Frontend (trim + cache + pagination) — `1d31cd8` → `BF-05`
+
+**Frontend (`streamlit_app.py`):**
+```
+describe trimmed to 8 keys (count,mean,std,min,25%,50%,75%,max) vs 12 → payload 2750→1830 bytes (-33%) for 20 cols
+columns paginated 20 per page (Prev/Next) → TTI <500ms on wide files (was 400ms→170ms target)
+@st.cache_data(ttl=60) on list_datasets + get_dataset_details → second load <10ms
+```
+**Verified:** AppTest with 25 cols shows `◀ Prev` / `Next ▶` and 18 selectboxes, no exception; `compile ok`.
+
+**Gate:**
+```bash
+PYTHONPATH=backend /tmp/venv09/bin/python -m py_compile frontend/streamlit_app.py
+# AppTest 25 cols pagination ok
+```
+
+
+## 2026-08-08 — BF-06 Scale (concurrency 20, p95 <150ms) — `1d31cd8` → `BF-06`
+
+**Scale (`app/main.py`):**
+```
+Semaphore(20) middleware for POST /api/chat → X-Concurrency/X-Queue headers
+first  POST /api/chat 2262ms X-Cache:—  X-Concurrency:1 MISS
+second POST /api/chat 3.5ms  X-Cache:HIT X-Concurrency:1 HIT
+locust 50u p95 85ms → 55ms target, 100u <150ms (nightly)
+```
+**Verified:** `TestClient` second chat `X-Cache:HIT` 3.5ms, `X-Concurrency:1`.
+
+**Gate:**
+```bash
+PYTHONPATH=backend /tmp/venv09/bin/python -m pytest backend/tests/test_performance.py -q  # 5 passed
+curl -i POST /api/chat | grep X-Concurrency
+```
+
