@@ -240,7 +240,7 @@ async def get_dataset(dataset_id: str, request: Request = None):
                 pass
             return resp
         except Exception as e:
-            profile = meta.get("profile") or {"column_names": meta.get("column_names", []), "numeric_columns": [], "categorical_columns": [], "inferred_roles": {}, "error": str(e)}
+            profile = meta.get("profile") or {"column_names": meta.get("column_names", []), "numeric_columns": [], "categorical_columns": [], "columns": [], "describe": {}, "duplicates": 0, "sample_rows": [], "null_summary": {}, "shape": {"rows": 0, "columns": len(meta.get("column_names", []))}, "inferred_roles": {}, "error": str(e)}
             preview = {"columns": meta.get("column_names", []), "data": [], "rows": 0, "columns_count": len(meta.get("column_names", [])), "truncated": False, "display_rows": 0}
             return ProfileResponse(dataset=DatasetResponse(**meta), profile=profile, preview=preview)
     try:

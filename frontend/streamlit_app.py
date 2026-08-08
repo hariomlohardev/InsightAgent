@@ -672,7 +672,7 @@ with tabs[1]:
     st.subheader("Data Preview (first 10 rows)")
     df_prev = pd.DataFrame(preview["data"])
     st.dataframe(df_prev, use_container_width=True)
-    st.json(profile["null_summary"])
+    st.json(profile.get("null_summary", {}))
     c1, c2 = st.columns(2)
     with c1:
         st.download_button("⬇️ Download Preview as CSV", df_prev.to_csv(index=False), file_name="preview.csv", mime="text/csv")
@@ -681,11 +681,11 @@ with tabs[1]:
 
 with tabs[2]:
     st.subheader("Column Profiling")
-    for col in profile["columns"]:
-        with st.expander(f"{col['name']} ({col['dtype']}) - nulls: {col['nulls']}, unique: {col['unique']}"):
+    for col in profile.get("columns", []):
+        with st.expander(f"{col.get('name','?')} ({col.get('dtype','')}) - nulls: {col.get('nulls',0)}, unique: {col.get('unique',0)}"):
             st.json(col)
     st.subheader("Full Describe")
-    st.json(profile["describe"])
+    st.json(profile.get("describe", {}))
 
 with tabs[3]:
     st.subheader("Quick Visual Insights")
@@ -1497,7 +1497,9 @@ with tabs[7]:
             st.toast("Prefilled", icon="📈")
     with a2:
         # Outliers
-        ocol = st.selectbox("Outlier col", profile.get("numeric_columns", []) or profile.get("column_names", [])[:3], key="an_out_col")
+        _out_opts = profile.get("numeric_columns") or profile.get("column_names") or ["Sales"]
+        _out_opts = [o for o in _out_opts if o][:3] or ["Sales"]
+        ocol = st.selectbox("Outlier col", _out_opts, key="an_out_col")
         omethod = st.selectbox("Method", ["iqr","zscore"], key="an_out_method")
         if st.button("🚨 Outliers", use_container_width=True, key="an_out_btn"):
             st.session_state["pending_query"] = f"Show outliers in {ocol} via {omethod}"
@@ -1506,8 +1508,12 @@ with tabs[7]:
             st.session_state["pending_query"] = "correlation heatmap"
             st.toast("Prefilled: correlation heatmap", icon="🔗")
     with a3:
-        by_col = st.selectbox("Segment by", profile.get("categorical_columns", []) or profile.get("column_names", [])[:4], key="an_seg_by")
-        metric = st.selectbox("Metric", profile.get("numeric_columns", []) or profile.get("column_names", [])[:4], key="an_seg_metric")
+        _seg_by_opts = profile.get("categorical_columns") or profile.get("column_names") or ["(none)"]
+        _seg_by_opts = [o for o in _seg_by_opts if o][:4] or ["(none)"]
+        by_col = st.selectbox("Segment by", _seg_by_opts, key="an_seg_by")
+        _seg_met_opts = profile.get("numeric_columns") or profile.get("column_names") or ["Sales"]
+        _seg_met_opts = [o for o in _seg_met_opts if o][:4] or ["Sales"]
+        metric = st.selectbox("Metric", _seg_met_opts, key="an_seg_metric")
         agg = st.selectbox("Agg", ["sum","mean","median","count"], key="an_seg_agg")
         if st.button("🧩 Segment", use_container_width=True, key="an_seg_btn"):
             st.session_state["pending_query"] = f"segment by {by_col}"
@@ -1518,7 +1524,9 @@ with tabs[7]:
     with a4:
         f_periods = st.slider("Forecast periods", 1, 12, 3, key="an_fc_periods")
         f_freq = st.selectbox("Freq", ["M","W","D"], index=0, key="an_fc_freq")
-        f_metric = st.selectbox("Forecast metric", profile.get("numeric_columns", []) or [profile.get("column_names", ["Sales"])[0]], key="an_fc_metric")
+        _fc_opts = profile.get("numeric_columns") or profile.get("column_names") or ["Sales"]
+        _fc_opts = [o for o in _fc_opts if o] or ["Sales"]
+        f_metric = st.selectbox("Forecast metric", _fc_opts, key="an_fc_metric")
         if st.button("🔮 Forecast", use_container_width=True, key="an_fc_btn"):
             st.session_state["pending_query"] = f"forecast {f_metric} for next {f_periods} months"
             if f_freq == "W":
@@ -1530,7 +1538,9 @@ with tabs[7]:
     st.divider()
     with st.container(border=True):
         st.markdown("**🧪 What-if simulator**")
-        w_col = st.selectbox("Column", profile.get("numeric_columns", []) or profile.get("column_names", []), key="an_w_col")
+        _w_opts = profile.get("numeric_columns") or profile.get("column_names") or ["Sales"]
+        _w_opts = [o for o in _w_opts if o] or ["Sales"]
+        w_col = st.selectbox("Column", _w_opts, key="an_w_col")
         w_pct = st.slider("Change %", -50, 100, 10, key="an_w_pct")
         w_by = st.selectbox("Group by (optional)", ["(none)"] + (profile.get("categorical_columns", []) or []), key="an_w_by")
         if st.button("Run what-if", key="an_w_btn"):
