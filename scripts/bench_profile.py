@@ -7,8 +7,10 @@ from pathlib import Path
 import pandas as pd
 import numpy as np
 
-def gen_csv(path: Path, rows: int, cols: int = 5):
-    print(f"Generating {rows} rows x {cols} cols -> {path} ...")
+def gen_csv(path: Path, rows: int, cols: int = 5, quiet: bool = False):
+    import sys
+    if not quiet:
+        print(f"Generating {rows} rows x {cols} cols -> {path} ...", file=sys.stderr)
     chunk = 500_000
     header_written = False
     for start in range(0, rows, chunk):
@@ -25,7 +27,8 @@ def gen_csv(path: Path, rows: int, cols: int = 5):
             df = df.iloc[:, :cols]
         df.to_csv(path, mode="w" if not header_written else "a", header=not header_written, index=False)
         header_written = True
-        print(f"  {end}/{rows}")
+        if not quiet:
+            print(f"  {end}/{rows}", file=sys.stderr)
 
 def load_dataset_df_csv(csv_path: Path, use_polars: bool = False):
     import pandas as pd
@@ -158,7 +161,7 @@ if __name__ == "__main__":
     args = ap.parse_args()
     tmp = Path(f"/tmp/bench_{args.rows}.csv")
     if not tmp.exists() or tmp.stat().st_size < 1000:
-        gen_csv(tmp, args.rows, args.cols)
+        gen_csv(tmp, args.rows, args.cols, quiet=args.json or args.quiet)
     results = []
     # polars
     if not args.no_polars:
