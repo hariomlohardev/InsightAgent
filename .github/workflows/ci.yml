@@ -219,11 +219,17 @@ jobs:
     timeout-minutes: 5
     steps:
       - uses: actions/checkout@v4
+      - name: Prepare env
+        run: |
+          if [ ! -f .env ] && [ -f .env.example ]; then cp .env.example .env && echo "created .env from .env.example"; fi
+          touch .env  # ensure exists for compose (now required: false, but keep for old runners)
       - name: docker compose config
         run: |
           docker compose version 2>&1 | head -n 5
           docker compose config > /tmp/compose.yml && echo "compose OK" && head -n 30 /tmp/compose.yml
-          docker compose -f docker-compose.yml config > /tmp/compose2.yml && echo "compose.yml OK" || docker-compose config > /tmp/compose2.yml
+          docker compose -f docker-compose.yml config > /tmp/compose2.yml && echo "compose.yml OK"
+          docker compose -f docker-compose.prod.yml config > /tmp/compose-prod.yml && echo "prod OK"
+          docker compose -f docker-compose.cloud.yml config > /tmp/compose-cloud.yml && echo "cloud OK"
 
   # ── 6. Security (soft, not blocking) ─────────────────────────────
   security:
