@@ -4,22 +4,36 @@ from app.core.profiling import profile_dataframe
 from app.agent import planner, coder, executor, explainer
 
 async def process_query(dataset_id: str, query: str, conversation_id: str = None) -> Dict[str, Any]:
-    """Full agent pipeline: plan -> code -> execute -> explain."""
-    # Load df
+    """Full agent pipeline: plan -> code -> execute -> explain. Handles cleaning via wrangle diff."""
     df = storage.load_dataset_df(dataset_id)
-    # Profile for context
     profile = profile_dataframe(df)
-
-    # 1. Plan
     intent = await planner.plan(query, profile)
-
-    # 2. Generate code
+    # For cleaning intent, also compute diff via wrangle for richer response
+    is_cleaning = intent.get("intent") == "cleaning"
     code_res = await coder.generate_code(query, profile, intent)
     code = code_res["code"]
     code_exp = code_res.get("explanation", "")
-
-    # 3. Execute
     exec_res = executor.execute_code(code, df)
+    # If cleaning, compute diff
+    diff = None
+    if is_cleaning and exec_res.get("success"):
+        try:
+            from app.core.wrangle import diff_dataframes
+            from app.core.security import get_safe_globals
+            import pandas as pd
+            safe_globals = get_safe_globals(df)
+            local_vars = {}
+            exec(code, safe_globals, local_vars)
+            after_df = local_vars.get("result")
+            if not isinstance(after_df, pd.DataFrame):
+                for v in local_vars.values():
+                    if isinstance(v, pd.DataFrame):
+                        after_df = v
+                        break
+            if isinstance(after_df, pd.DataFrame):
+                diff = diff_dataframes(df, after_df)
+        except Exception:
+            diff = None
 
     # 4. Explain
     insight = await explainer.explain(
@@ -84,13 +98,31 @@ async def process_query(dataset_id: str, query: str, conversation_id: str = None
         "stdout": exec_res.get("stdout"),
     }
 
-# Fix: better wrapper that handles conversation_id correctly
+# Fix: better wrapper that handles conversation_id correctly - L4 adds connector sql detection
 async def process_query_v2(dataset_id: str, query: str, conversation_id: str = None) -> Dict[str, Any]:
     from app.core import storage as st
     import uuid
+    # L4: if dataset is connector, force intent to sql even if query is NL (so coder can try NL→SQL)
+    meta = st.get_dataset_meta(dataset_id)
+    is_connector = meta and meta.get("type") == "connector"
     df = st.load_dataset_df(dataset_id)
     profile = profile_dataframe(df)
+    if is_connector and not query.strip().lower().startswith(("select","with")):
+        # Inject hint so planner/coder treat as sql — preserve analytics intent
+        ql = query.lower()
+        if not any(k in ql for k in ["forecast","predict","outlier","anomal","segment","cohort","what if","why","explain","correlation","heatmap"]):
+            profile["_intent_hint"] = "sql"
+            profile["_intent"] = "sql"
     intent = await planner.plan(query, profile)
+    # L4/L5: override intent for connectors so NL queries are treated as sql (enables NL→SQL) — but not for analytics
+    if is_connector:
+        if intent.get("intent") != "analytics" and not query.strip().lower().startswith(("select","with")):
+            # Don't hijack analytics queries like forecast/why/outlier on connectors — keep analytics intent
+            is_analytics_q = any(k in query.lower() for k in ["forecast","predict","outlier","segment","cohort","what if","why","explain","correlation","heatmap"])
+            if not is_analytics_q:
+                intent["intent"] = "sql"
+                intent["chart_type"] = "bar"
+                intent["_forced_connector"] = True
     code_res = await coder.generate_code(query, profile, intent)
     code = code_res["code"]
     code_exp = code_res.get("explanation", "")
@@ -103,7 +135,26 @@ async def process_query_v2(dataset_id: str, query: str, conversation_id: str = N
         # create conversation file directly
     # Save user
     st.save_conversation_message(dataset_id, conversation_id, "user", {"query": query})
-    # Save assistant
+    # Save assistant with diff for cleaning
+    diff = None
+    if intent.get("intent") == "cleaning" and exec_res.get("success"):
+        try:
+            from app.core.wrangle import diff_dataframes
+            from app.core.security import get_safe_globals
+            import pandas as pd
+            safe_globals = get_safe_globals(df)
+            local_vars = {}
+            exec(code, safe_globals, local_vars)
+            after_df = local_vars.get("result")
+            if not isinstance(after_df, pd.DataFrame):
+                for v in local_vars.values():
+                    if isinstance(v, pd.DataFrame):
+                        after_df = v
+                        break
+            if isinstance(after_df, pd.DataFrame):
+                diff = diff_dataframes(df, after_df)
+        except Exception:
+            diff = None
     assistant_content = {
         "query": query,
         "intent": intent,
@@ -115,6 +166,7 @@ async def process_query_v2(dataset_id: str, query: str, conversation_id: str = N
         "insight": insight,
         "error": exec_res.get("error"),
         "stdout": exec_res.get("stdout"),
+        "diff": diff,
     }
     st.save_conversation_message(dataset_id, conversation_id, "assistant", assistant_content)
 
@@ -130,4 +182,5 @@ async def process_query_v2(dataset_id: str, query: str, conversation_id: str = N
         "insight": insight,
         "error": exec_res.get("error"),
         "stdout": exec_res.get("stdout"),
+        "diff": diff,
     }

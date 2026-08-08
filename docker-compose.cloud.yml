@@ -1,0 +1,88 @@
+version: "3.8"
+services:
+  backend:
+    build: ./backend
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./storage:/app/storage
+      - ./sample_data:/app/sample_data
+    env_file:
+      - .env
+    environment:
+      - STORAGE_PATH=/app/storage
+      - CLOUD=${CLOUD:-true}
+      - AUTH_REQUIRED=${AUTH_REQUIRED:-true}
+      - ENTERPRISE=${ENTERPRISE:-true}
+      - JWT_SECRET=${JWT_SECRET}
+      - REDIS_URL=redis://redis:6379/0
+      - STRIPE_SECRET_KEY=${STRIPE_SECRET_KEY:-sk_test_mock}
+      - STRIPE_WEBHOOK_SECRET=${STRIPE_WEBHOOK_SECRET:-whsec_mock}
+      - STORAGE_BACKEND=${STORAGE_BACKEND:-fs}
+      - OLLAMA_URL=http://ollama:11434
+    restart: always
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+
+  frontend:
+    build: ./frontend
+    ports:
+      - "8501:8501"
+    depends_on:
+      - backend
+      - redis
+    env_file:
+      - .env
+    environment:
+      - BACKEND_URL=http://backend:8000
+      - CLOUD=true
+      - AUTH_REQUIRED=true
+    restart: always
+
+  redis:
+    image: redis:7-alpine
+    restart: always
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 3
+
+  worker:
+    build: ./backend
+    command: celery -A app.worker.celery_app worker --loglevel=info
+    depends_on:
+      - redis
+      - backend
+    env_file:
+      - .env
+    environment:
+      - REDIS_URL=redis://redis:6379/0
+      - STORAGE_PATH=/app/storage
+      - CLOUD=true
+    volumes:
+      - ./storage:/app/storage
+    restart: always
+
+  ollama:
+    image: ollama/ollama:0.3
+    ports:
+      - "11434:11434"
+    volumes:
+      - ollama:/root/.ollama
+    restart: unless-stopped
+    profiles: ["cloud"]
+    # init pull is manual: docker exec ollama ollama pull llama3.1:8b
+
+  landing:
+    build: ./landing
+    ports:
+      - "3000:3000"
+    restart: always
+    profiles: ["cloud"]
+
+volumes:
+  ollama:

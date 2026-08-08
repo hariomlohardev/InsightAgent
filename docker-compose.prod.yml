@@ -1,0 +1,61 @@
+version: "3.8"
+services:
+  backend:
+    build: ./backend
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./storage:/app/storage
+      - ./sample_data:/app/sample_data
+    env_file:
+      - .env
+    environment:
+      - STORAGE_PATH=/app/storage
+      - AUTH_REQUIRED=${AUTH_REQUIRED:-true}
+      - ENTERPRISE=${ENTERPRISE:-true}
+      - JWT_SECRET=${JWT_SECRET}
+      - REDIS_URL=redis://redis:6379/0
+      - S3_BUCKET=${S3_BUCKET:-}
+      - STORAGE_BACKEND=${STORAGE_BACKEND:-fs}
+    restart: always
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+
+  frontend:
+    build: ./frontend
+    ports:
+      - "8501:8501"
+    depends_on:
+      - backend
+      - redis
+    environment:
+      - BACKEND_URL=http://backend:8000
+      - AUTH_REQUIRED=true
+    restart: always
+
+  redis:
+    image: redis:7-alpine
+    restart: always
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 3
+
+  worker:
+    build: ./backend
+    command: celery -A app.worker.celery_app worker --loglevel=info
+    depends_on:
+      - redis
+      - backend
+    env_file:
+      - .env
+    environment:
+      - REDIS_URL=redis://redis:6379/0
+      - STORAGE_PATH=/app/storage
+    volumes:
+      - ./storage:/app/storage
+    restart: always

@@ -1,0 +1,41 @@
+version: "3.8"
+services:
+  backend:
+    build: ./backend
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./storage:/app/storage
+      - ./sample_data:/app/sample_data
+    env_file:
+      - .env
+    environment:
+      - STORAGE_PATH=/app/storage
+      - DATABASE_URL=${DATABASE_URL:-}
+      - STORAGE_BACKEND=${STORAGE_BACKEND:-fs}
+      - SENTRY_DSN=${SENTRY_DSN:-}
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+
+  frontend:
+    build: ./frontend
+    ports:
+      - "8501:8501"
+    depends_on:
+      backend:
+        condition: service_healthy
+    environment:
+      - BACKEND_URL=http://backend:8000
+      - AUTH_REQUIRED=false
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    restart: unless-stopped
+
+# Demo: read-only, no upload/delete, sample_data seeded, ?demo=1
+# Usage: docker compose -f docker-compose.demo.yml up --build
+# Then open http://localhost:8501/?demo=1

@@ -1,0 +1,28 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "insightagent"
+version = "0.10.0"
+description = "InsightAgent SDK — Chat with your CSV/Excel/SQL. Works with local (docker-compose up) or cloud."
+readme = "README.md"
+license = {text = "MIT"}
+requires-python = ">=3.10"
+dependencies = ["httpx>=0.27", "pandas>=2.0"]
+authors = [{name="InsightAgent"}]
+keywords = ["data", "analytics", "llm", "pandas", "sql"]
+classifiers = ["License :: OSI Approved :: MIT License", "Programming Language :: Python :: 3.10"]
+
+[project.urls]
+Homepage = "https://github.com/your-org/insightagent"
+Documentation = "https://your-org.github.io/insightagent"
+
+[project.optional-dependencies]
+dev = ["pytest>=8", "pytest-asyncio", "httpx"]
+
+[project.entry-points."insightagent.connectors"]
+# example: my_connector = "my_plugin.connector:MyConnector" (pip installable)
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]

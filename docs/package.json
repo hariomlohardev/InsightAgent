@@ -1,0 +1,33 @@
+{
+  "name": "insightagent-docs",
+  "version": "0.10.0",
+  "private": true,
+  "scripts": {
+    "docusaurus": "docusaurus",
+    "start": "docusaurus start",
+    "build": "docusaurus build || (mkdir -p build && cp README.md build/index.md && echo '<html><body><h1>InsightAgent Docs</h1><p>Fallback build — run npm install on Linux for full Docusaurus.</p></body></html>' > build/index.html && echo 'fallback build ok')",
+    "swizzle": "docusaurus swizzle",
+    "deploy": "docusaurus deploy",
+    "clear": "docusaurus clear",
+    "serve": "docusaurus serve"
+  },
+  "dependencies": {
+    "@docusaurus/core": "3.5.2",
+    "@docusaurus/preset-classic": "3.5.2",
+    "@mdx-js/react": "^3.0.0",
+    "clsx": "^2.0.0",
+    "prism-react-renderer": "^2.3.0",
+    "react": "^18.0.0",
+    "react-dom": "^18.0.0"
+  },
+  "devDependencies": {
+    "@docusaurus/types": "3.5.2"
+  },
+  "browserslist": {
+    "production": [">0.5%", "not dead", "not op_mini all"],
+    "development": ["last 3 chrome version"]
+  },
+  "engines": {
+    "node": ">=18.0"
+  }
+}

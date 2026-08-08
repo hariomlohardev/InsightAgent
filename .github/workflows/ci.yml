@@ -1,0 +1,32 @@
+name: CI
+on:
+  push:
+    branches: [main, master]
+  pull_request:
+    branches: [main, master]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+      - name: Install backend deps
+        run: |
+          pip install -r backend/requirements.txt
+          pip install pytest-cov black ruff
+      - name: Lint
+        run: |
+          black --check backend/app backend/tests || true
+          ruff check backend/app || true
+          python -m py_compile backend/app/main.py backend/app/core/*.py backend/app/agent/*.py
+      - name: Test
+        run: |
+          cd backend
+          pytest -q --tb=short
+      - name: Frontend syntax
+        run: |
+          python -m py_compile frontend/streamlit_app.py

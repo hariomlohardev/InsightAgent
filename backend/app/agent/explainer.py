@@ -3,6 +3,7 @@ import json
 from typing import Dict, Any, Optional
 
 from app.agent.prompts import SYSTEM_EXPLAINER_PROMPT
+from app.core.llm import get_llm
 
 def fallback_explain(query: str, result_json: Optional[Dict[str, Any]], error: Optional[str], profile: Dict[str, Any]) -> str:
     """Template-based insights when no LLM."""
@@ -56,16 +57,12 @@ def fallback_explain(query: str, result_json: Optional[Dict[str, Any]], error: O
     return "\n".join(lines)
 
 async def explain(query: str, result_json: Optional[Dict[str, Any]], error: Optional[str], profile: Dict[str, Any], stdout: str = "") -> str:
-    """Use LLM if available else fallback."""
-    api_key = os.getenv("OPENAI_API_KEY")
-    if not api_key:
+    """Use LLM if available else fallback. Supports all providers."""
+    llm = get_llm()
+    if not llm:
         return fallback_explain(query, result_json, error, profile)
 
     try:
-        from openai import AsyncOpenAI
-        client = AsyncOpenAI(api_key=api_key)
-        
-        # Build context
         result_summary = ""
         if result_json:
             result_summary = f"Result: {result_json.get('rows')} rows, columns {result_json.get('columns')}, sample data: {json.dumps(result_json.get('data', [])[:2], indent=2)}"
@@ -75,20 +72,16 @@ async def explain(query: str, result_json: Optional[Dict[str, Any]], error: Opti
             result_summary += f"\nStdout: {stdout[:500]}"
 
         profile_text = f"Dataset shape: {profile.get('shape')}, columns: {profile.get('column_names')}"
-
         user_msg = f"User Query: {query}\nProfile: {profile_text}\n{result_summary}\n\nProvide insights:"
 
-        resp = await client.chat.completions.create(
-            model=os.getenv("OPENAI_MODEL", "gpt-4o-mini"),
-            messages=[
-                {"role": "system", "content": SYSTEM_EXPLAINER_PROMPT},
-                {"role": "user", "content": user_msg}
-            ],
+        content = await llm.chat(
+            SYSTEM_EXPLAINER_PROMPT,
+            user_msg,
+            json_mode=False,
             temperature=0.3,
             max_tokens=400,
         )
-        content = resp.choices[0].message.content
         return content.strip()
     except Exception as e:
-        print(f"Explainer LLM failed: {e}")
+        print(f"Explainer LLM ({llm.provider if llm else 'none'}) failed: {e}")
         return fallback_explain(query, result_json, error, profile)

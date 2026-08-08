@@ -1,20 +1,86 @@
 import pandas as pd
 import numpy as np
+import re
 from typing import Dict, Any
 
-def profile_dataframe(df: pd.DataFrame, sample_n: int = 5) -> Dict[str, Any]:
-    """Generate profiling info for LLM context and UI."""
+def profile_dataframe(df: pd.DataFrame, sample_n: int = 5, use_cache: bool = True, dataset_id: str = None, version: int = None) -> Dict[str, Any]:
+    """Generate profiling info for LLM context and UI. Robust for empty, wide, dirty files. Cached 60s if use_cache."""
+    # Cache check — key by dataset_id:version when provided (correct invalidation), else fallback to shape hash
+    if use_cache:
+        try:
+            from app.core.cache import get as cache_get, set as cache_set, cache_key
+            if dataset_id is not None:
+                # Primary key for 10.2: profile:{dataset_id}:{version}
+                ck = cache_key(f"profile:{dataset_id}:{version if version is not None else 0}")
+            else:
+                ck = cache_key("profile", str(df.shape), ",".join(map(str, df.columns[:5])), str(id(df) % 100000))
+            cached = cache_get(ck)
+            if cached:
+                return cached
+        except:
+            pass
+    # Guard empty df
+    if df is None or df.shape[1] == 0:
+        return {
+            "shape": {"rows": 0, "columns": 0},
+            "columns": [],
+            "numeric_columns": [],
+            "categorical_columns": [],
+            "describe": {},
+            "duplicates": 0,
+            "sample_rows": [],
+            "null_summary": {},
+            "column_names": [],
+            "inferred_roles": {},
+        }
+    
     rows, cols = df.shape
     
+    # Handle empty rows but with columns
+    if rows == 0:
+        columns = []
+        for col in df.columns:
+            columns.append({
+                "name": str(col),
+                "dtype": str(df[col].dtype),
+                "nulls": 0,
+                "non_nulls": 0,
+                "unique": 0,
+                "sample_values": [],
+                "inferred_type": "empty",
+            })
+        return {
+            "shape": {"rows": 0, "columns": int(cols)},
+            "columns": columns,
+            "numeric_columns": [str(c) for c in df.select_dtypes(include=[np.number]).columns.tolist()],
+            "categorical_columns": [str(c) for c in df.select_dtypes(include=["object", "category"]).columns.tolist()],
+            "describe": {},
+            "duplicates": 0,
+            "sample_rows": [],
+            "null_summary": {str(col): 0 for col in df.columns},
+            "column_names": [str(c) for c in df.columns.tolist()],
+            "inferred_roles": {str(c): "dimension" for c in df.columns.tolist()},
+        }
+
     columns = []
+    inferred_roles = {}
+    
+    # Regex for date-like strings (YYYY-MM-DD, MM/DD/YYYY, etc)
+    date_pattern = re.compile(r"^\d{4}[-/]\d{1,2}[-/]\d{1,2}$|^\d{1,2}[-/]\d{1,2}[-/]\d{4}$|^\d{4}[-/]\d{1,2}[-/]\d{1,2} \d{1,2}:\d{2}")
+    
     for col in df.columns:
         dtype = str(df[col].dtype)
         nulls = int(df[col].isna().sum())
         non_nulls = int(rows - nulls)
-        unique = int(df[col].nunique(dropna=True))
-        sample_vals = df[col].dropna().head(3).tolist()
-        # Convert to JSON serializable
-        sample_vals = [str(v) for v in sample_vals]
+        try:
+            unique = int(df[col].nunique(dropna=True))
+        except Exception:
+            unique = 0
+        try:
+            sample_vals = df[col].dropna().head(3).tolist()
+            sample_vals = [str(v) for v in sample_vals]
+        except Exception:
+            sample_vals = []
 
         col_info = {
             "name": str(col),
@@ -27,41 +93,67 @@ def profile_dataframe(df: pd.DataFrame, sample_n: int = 5) -> Dict[str, Any]:
 
         # Numeric stats
         if pd.api.types.is_numeric_dtype(df[col]):
-            col_info["stats"] = {
-                "mean": float(df[col].mean()) if non_nulls > 0 else None,
-                "min": float(df[col].min()) if non_nulls > 0 else None,
-                "max": float(df[col].max()) if non_nulls > 0 else None,
-                "median": float(df[col].median()) if non_nulls > 0 else None,
-                "std": float(df[col].std()) if non_nulls > 0 else None,
-            }
+            try:
+                col_info["stats"] = {
+                    "mean": float(df[col].mean()) if non_nulls > 0 else None,
+                    "min": float(df[col].min()) if non_nulls > 0 else None,
+                    "max": float(df[col].max()) if non_nulls > 0 else None,
+                    "median": float(df[col].median()) if non_nulls > 0 else None,
+                    "std": float(df[col].std()) if non_nulls > 0 else None,
+                }
+                inferred_roles[str(col)] = "measure"
+            except Exception:
+                inferred_roles[str(col)] = "measure"
         # Categorical stats
         elif df[col].dtype == object or pd.api.types.is_categorical_dtype(df[col]):
-            top_vals = df[col].value_counts(dropna=True).head(5).to_dict()
-            # Convert keys to string
-            col_info["top_values"] = {str(k): int(v) for k, v in top_vals.items()}
-
-        # Datetime detection
-        # Try to infer if column looks like date
-        if dtype == "object":
             try:
-                # Sample check if parseable as date
-                sample = df[col].dropna().head(5)
-                if len(sample) > 0:
-                    pd.to_datetime(sample, errors="raise")
-                    col_info["inferred_type"] = "datetime"
+                top_vals = df[col].value_counts(dropna=True).head(5).to_dict()
+                col_info["top_values"] = {str(k): int(v) for k, v in top_vals.items()}
             except Exception:
-                pass
+                col_info["top_values"] = {}
+            
+            # Datetime detection - only on object cols with date-like sample
+            if dtype == "object":
+                try:
+                    sample = df[col].dropna().head(5)
+                    if len(sample) > 0:
+                        # Only try if sample looks date-like via regex
+                        sample_str = [str(v) for v in sample]
+                        if any(date_pattern.match(s.strip()) for s in sample_str):
+                            # Use coerce, not raise, to avoid warnings
+                            parsed = pd.to_datetime(sample, errors="coerce", utc=False)
+                            if not parsed.isna().all():
+                                col_info["inferred_type"] = "datetime"
+                                inferred_roles[str(col)] = "datetime"
+                except Exception:
+                    pass
+            # Default role for object is dimension (if not already set as datetime)
+            if str(col) not in inferred_roles:
+                inferred_roles[str(col)] = "dimension"
+        else:
+            # datetime etc
+            inferred_roles[str(col)] = "dimension" if "object" in dtype or "category" in dtype else "measure"
 
         columns.append(col_info)
 
     # Overall stats
-    numeric_cols = df.select_dtypes(include=[np.number]).columns.tolist()
-    categorical_cols = df.select_dtypes(include=["object", "category"]).columns.tolist()
-    
-    # Try numeric describe
     try:
-        describe = df.describe(include="all").fillna("").to_dict()
-        # Make JSON serializable
+        numeric_cols = df.select_dtypes(include=[np.number]).columns.tolist()
+    except Exception:
+        numeric_cols = []
+    try:
+        categorical_cols = df.select_dtypes(include=["object", "category"]).columns.tolist()
+    except Exception:
+        categorical_cols = []
+    
+    # Try numeric describe, limit to 20 cols to avoid blowup on wide files
+    try:
+        # Limit df for describe if wide
+        if len(df.columns) > 20:
+            describe_df = df.iloc[:, :20]
+        else:
+            describe_df = df
+        describe = describe_df.describe(include="all").fillna("").to_dict()
         for k, v in describe.items():
             for kk, vv in v.items():
                 if isinstance(vv, (np.integer, np.floating)):
@@ -72,29 +164,36 @@ def profile_dataframe(df: pd.DataFrame, sample_n: int = 5) -> Dict[str, Any]:
         describe = {}
 
     # Duplicates
-    duplicates = int(df.duplicated().sum())
+    try:
+        duplicates = int(df.duplicated().sum())
+    except Exception:
+        duplicates = 0
 
     # Sample rows
-    sample_rows = df.head(sample_n).fillna("").to_dict(orient="records")
-    # Convert values to string for safety
-    for row in sample_rows:
-        for k, v in row.items():
-            if isinstance(v, (np.integer, np.floating)):
-                row[k] = float(v)
-            elif isinstance(v, (pd.Timestamp,)):
-                row[k] = str(v)
-            else:
-                # Keep as is but ensure JSON serializable
-                try:
-                    import json
-                    json.dumps(v)
-                except:
+    try:
+        sample_rows = df.head(sample_n).fillna("").to_dict(orient="records")
+        for row in sample_rows:
+            for k, v in list(row.items()):
+                if isinstance(v, (np.integer, np.floating)):
+                    row[k] = float(v)
+                elif isinstance(v, (pd.Timestamp,)):
                     row[k] = str(v)
+                else:
+                    try:
+                        import json
+                        json.dumps(v)
+                    except:
+                        row[k] = str(v)
+    except Exception:
+        sample_rows = []
 
     # Null summary
-    null_summary = {str(col): int(df[col].isna().sum()) for col in df.columns}
+    try:
+        null_summary = {str(col): int(df[col].isna().sum()) for col in df.columns}
+    except Exception:
+        null_summary = {}
 
-    return {
+    result = {
         "shape": {"rows": int(rows), "columns": int(cols)},
         "columns": columns,
         "numeric_columns": [str(c) for c in numeric_cols],
@@ -104,23 +203,42 @@ def profile_dataframe(df: pd.DataFrame, sample_n: int = 5) -> Dict[str, Any]:
         "sample_rows": sample_rows,
         "null_summary": null_summary,
         "column_names": [str(c) for c in df.columns.tolist()],
+        "inferred_roles": inferred_roles,
     }
+    if use_cache:
+        try:
+            from app.core.cache import set as cache_set, cache_key
+            if dataset_id is not None:
+                ck = cache_key(f"profile:{dataset_id}:{version if version is not None else 0}")
+            else:
+                ck = cache_key("profile", str(result["shape"]), ",".join(map(str, result["column_names"][:5])))
+            cache_set(ck, result, ttl=60)
+        except:
+            pass
+    return result
 
 def get_profile_summary_text(profile: Dict[str, Any]) -> str:
     """Create compact text for LLM prompt."""
     lines = []
     lines.append(f"Dataset shape: {profile['shape']['rows']} rows x {profile['shape']['columns']} columns")
     lines.append(f"Columns: {', '.join(profile['column_names'])}")
+    if profile.get("inferred_roles"):
+        lines.append(f"Roles: {profile['inferred_roles']}")
     lines.append("Column details:")
     for col in profile["columns"]:
         line = f"- {col['name']} ({col['dtype']}), unique={col['unique']}, nulls={col['nulls']}, sample={col['sample_values']}"
         if "stats" in col:
             s = col["stats"]
-            line += f", stats(mean={s['mean']:.2f} min={s['min']} max={s['max']})" if s["mean"] is not None else ""
+            if s["mean"] is not None:
+                try:
+                    line += f", stats(mean={s['mean']:.2f} min={s['min']} max={s['max']})"
+                except:
+                    pass
         if "top_values" in col:
             line += f", top={col['top_values']}"
+        if "inferred_type" in col:
+            line += f", inferred={col['inferred_type']}"
         lines.append(line)
-    # Add sample rows
     lines.append("Sample rows (first 2):")
     for r in profile["sample_rows"][:2]:
         lines.append(str(r))

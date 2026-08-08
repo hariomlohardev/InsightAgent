@@ -1,0 +1,236 @@
+import time
+import re
+import io
+from pathlib import Path
+from typing import Dict, Any, Optional, List
+import pandas as pd
+
+from app.core.security import SecurityError
+
+# ---- SQL guard ----
+WRITE_KEYWORDS = ["insert ", "update ", "delete ", "drop ", "create ", "alter ", "truncate ", "grant ", "revoke "]
+# Allowed to start with SELECT / WITH / SHOW / DESCRIBE / EXPLAIN
+ALLOWED_START = ("select", "with", "show", "describe", "explain", "pragma")
+
+def validate_sql(sql: str) -> None:
+    """Raise SecurityError if sql contains write/DDL."""
+    if not sql or not sql.strip():
+        raise SecurityError("Empty SQL")
+    s = sql.strip().lower()
+    # Normalize
+    # Remove comments
+    s = re.sub(r"--.*", " ", s)
+    s = re.sub(r"/\*.*?\*/", " ", s, flags=re.DOTALL)
+    s_stripped = s.strip()
+    if not s_stripped.startswith(ALLOWED_START):
+        # Allow union of selects: check if starts with '(' then select
+        if not (s_stripped.startswith("(") and "select" in s_stripped[:50]):
+            raise SecurityError(f"Only SELECT/WITH queries allowed, got: {sql[:30]!r}")
+    for kw in WRITE_KEYWORDS:
+        if kw in s:
+            raise SecurityError(f"SQL blocked: contains '{kw.strip().upper()}' — read-only only")
+
+# ---- Cache for sheets ----
+_SHEETS_CACHE: Dict[str, Any] = {}  # id -> {df, ts}
+
+def _sheets_export_url(sheet_url_or_id: str) -> str:
+    # Extract id from full URL
+    # https://docs.google.com/spreadsheets/d/<ID>/edit#gid=0
+    # or https://docs.google.com/spreadsheets/d/<ID>/export?format=csv
+    m = re.search(r"/d/([a-zA-Z0-9-_]+)", sheet_url_or_id)
+    if m:
+        doc_id = m.group(1)
+    else:
+        # Could be raw ID
+        doc_id = sheet_url_or_id.strip().split("/")[0].split("?")[0]
+        if len(doc_id) < 10:
+            raise ValueError(f"Invalid Sheets ID/URL: {sheet_url_or_id[:60]}")
+    return f"https://docs.google.com/spreadsheets/d/{doc_id}/export?format=csv"
+
+def fetch_sheets_df(connector: Dict[str, Any], limit: int = 500, sql: str = None) -> pd.DataFrame:
+    sheet_url = connector.get("sheet_url") or connector.get("dsn") or connector.get("table")
+    if not sheet_url:
+        raise ValueError("Sheets connector missing sheet_url")
+    cache_id = connector.get("id", sheet_url)
+    now = time.time()
+    cached = _SHEETS_CACHE.get(cache_id)
+    if cached and (now - cached["ts"] < 60) and not sql:
+        df = cached["df"]
+    else:
+        url = _sheets_export_url(sheet_url)
+        is_httpx = False
+        r = None
+        try:
+            try:
+                import requests
+                r = requests.get(url, timeout=10)
+            except ImportError:
+                import httpx
+                r = httpx.get(url, timeout=10)
+                is_httpx = True
+        except Exception as e:
+            raise RuntimeError(f"Sheets fetch failed: {e}")
+        if r is None or r.status_code != 200:
+            raise RuntimeError(f"Sheets fetch failed ({getattr(r, 'status_code', 'no response')}). Make sheet public (Anyone with link) or add SHEETS_API_KEY in .env (private sheets need OAuth — coming in L7). URL: {url[:60]}")
+        text = r.text
+        if not text.strip():
+            raise RuntimeError("Sheets returned empty CSV")
+        df = pd.read_csv(io.StringIO(text))
+        _SHEETS_CACHE[cache_id] = {"df": df, "ts": now}
+        # Also cache to disk for persistence
+        try:
+            from app.config import get_storage_path
+            cache_dir = get_storage_path() / "connectors" / "cache"
+            cache_dir.mkdir(parents=True, exist_ok=True)
+            df.to_csv(cache_dir / f"{cache_id}.csv", index=False)
+        except Exception:
+            pass
+    # SQL filtering via duckdb if provided
+    if sql:
+        validate_sql(sql)
+        import duckdb
+        con = duckdb.connect()
+        con.register("df", df)
+        try:
+            result = con.execute(sql).df()
+            return result.head(limit) if limit else result
+        finally:
+            con.close()
+    if limit:
+        return df.head(limit)
+    return df
+
+def fetch_sqlite_df(connector: Dict[str, Any], limit: int = 500, sql: str = None) -> pd.DataFrame:
+    dsn = connector.get("dsn") or connector.get("db_path") or ":memory:"
+    table = connector.get("table")
+    # For tests, support dsn = path to csv-loaded :memory: setup is handled via table existence
+    import sqlite3
+    # If dsn is a file path that doesn't exist, error
+    # But for :memory: we need to check if connector has _memory_init marker — but we'll just connect fresh and check
+    # To support CI, if dsn == ":memory:" and connector has "init_sql" we run it
+    init_sql = connector.get("init_sql")
+    conn = sqlite3.connect(dsn)
+    try:
+        if init_sql:
+            conn.executescript(init_sql)
+        if sql:
+            validate_sql(sql)
+            return pd.read_sql_query(sql, conn)
+        if table:
+            # Validate table name (alnum + _)
+            if not re.match(r"^[a-zA-Z_][a-zA-Z0-9_]*$", table):
+                raise ValueError(f"Invalid table name: {table}")
+            q = f'SELECT * FROM "{table}" LIMIT {int(limit) if limit else 500}'
+            return pd.read_sql_query(q, conn)
+        # No table: list tables and fetch first
+        tables = pd.read_sql_query("SELECT name FROM sqlite_master WHERE type='table'", conn)
+        if tables.empty:
+            raise ValueError("SQLite DB has no tables")
+        first = tables.iloc[0]["name"]
+        q = f'SELECT * FROM "{first}" LIMIT {int(limit) if limit else 500}'
+        return pd.read_sql_query(q, conn)
+    finally:
+        conn.close()
+
+def fetch_postgres_df(connector: Dict[str, Any], limit: int = 500, sql: str = None) -> pd.DataFrame:
+    dsn = connector.get("dsn")
+    if not dsn:
+        raise ValueError("Postgres connector missing dsn")
+    if sql:
+        validate_sql(sql)
+    else:
+        table = connector.get("table")
+        if not table:
+            raise ValueError("Postgres connector requires table or sql")
+        # Validate table
+        if not re.match(r"^[a-zA-Z_][a-zA-Z0-9_\"\.]*$", table):
+            raise ValueError(f"Invalid table: {table}")
+        sql = f'SELECT * FROM {table} LIMIT {int(limit) if limit else 500}'
+    # Try sqlalchemy if available, else psycopg2
+    try:
+        from sqlalchemy import create_engine, text
+        engine = create_engine(dsn, connect_args={"connect_timeout": 5})
+        with engine.connect() as conn:
+            # For postgres, we can try setting read-only transaction
+            # But keep simple: just read
+            return pd.read_sql(text(sql), conn)
+    except ImportError:
+        pass
+    # Fallback psycopg2
+    try:
+        import psycopg2
+        conn = psycopg2.connect(dsn, connect_timeout=5)
+        try:
+            return pd.read_sql(sql, conn)
+        finally:
+            conn.close()
+    except ImportError as e:
+        raise RuntimeError("Postgres driver not installed: pip install psycopg2-binary sqlalchemy — or use SQLite for testing")
+    except Exception as e:
+        raise RuntimeError(f"Postgres query failed: {e}")
+
+def fetch_mysql_df(connector: Dict[str, Any], limit: int = 500, sql: str = None) -> pd.DataFrame:
+    dsn = connector.get("dsn")
+    if not dsn:
+        raise ValueError("MySQL connector missing dsn")
+    if sql:
+        validate_sql(sql)
+    else:
+        table = connector.get("table")
+        if not table:
+            raise ValueError("MySQL requires table or sql")
+        if not re.match(r"^[a-zA-Z_][a-zA-Z0-9_]*$", table):
+            raise ValueError(f"Invalid table: {table}")
+        sql = f"SELECT * FROM `{table}` LIMIT {int(limit) if limit else 500}"
+    try:
+        from sqlalchemy import create_engine, text
+        engine = create_engine(dsn, connect_args={"connect_timeout": 5})
+        with engine.connect() as conn:
+            return pd.read_sql(text(sql), conn)
+    except ImportError:
+        pass
+    try:
+        import pymysql
+        # dsn for pymysql is not url; we try to parse
+        # For now error if no sqlalchemy
+        raise RuntimeError("MySQL driver not installed: pip install pymysql sqlalchemy")
+    except Exception as e:
+        raise RuntimeError(f"MySQL query failed: {e}")
+
+def fetch_bigquery_df(connector: Dict[str, Any], limit: int = 500, sql: str = None) -> pd.DataFrame:
+    # Check credentials
+    import os
+    creds = connector.get("credentials_json") or os.getenv("GOOGLE_APPLICATION_CREDENTIALS") or os.getenv("BIGQUERY_CREDENTIALS")
+    if not creds:
+        raise RuntimeError("BigQuery not configured: set GOOGLE_APPLICATION_CREDENTIALS (path to service JSON) or pass credentials_json — see docs. Returning 501.")
+    if sql:
+        validate_sql(sql)
+    else:
+        table = connector.get("table")
+        if not table:
+            raise ValueError("BigQuery requires table (e.g., project.dataset.table) or sql")
+        sql = f"SELECT * FROM `{table}` LIMIT {int(limit) if limit else 500}"
+    try:
+        import pandas_gbq
+        # pandas_gbq will use credentials
+        # We pass sql directly
+        return pandas_gbq.read_gbq(sql)
+    except ImportError:
+        raise RuntimeError("BigQuery driver not installed: pip install pandas-gbq google-cloud-bigquery")
+    except Exception as e:
+        raise RuntimeError(f"BigQuery query failed: {e}")
+
+def fetch_df(connector: Dict[str, Any], limit: int = 500, sql: str = None) -> pd.DataFrame:
+    kind = (connector.get("kind") or connector.get("type") or "").lower()
+    if kind in ("postgres", "postgresql"):
+        return fetch_postgres_df(connector, limit=limit, sql=sql)
+    elif kind in ("mysql",):
+        return fetch_mysql_df(connector, limit=limit, sql=sql)
+    elif kind in ("sqlite",):
+        return fetch_sqlite_df(connector, limit=limit, sql=sql)
+    elif kind in ("bigquery", "bq"):
+        return fetch_bigquery_df(connector, limit=limit, sql=sql)
+    elif kind in ("sheets", "gsheets", "google_sheets"):
+        return fetch_sheets_df(connector, limit=limit, sql=sql)
+    else:
+        raise ValueError(f"Unknown connector kind: {kind}. Supported: postgres, mysql, sqlite, bigquery, sheets")

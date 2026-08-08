@@ -1,0 +1,9 @@
+# Code Owners — PR review
+
+* @insightagent/maintainers
+
+.github/ @insightagent/maintainers
+backend/ @insightagent/maintainers
+sdk/ @insightagent/maintainers
+docs/ @insightagent/maintainers
+frontend/ @insightagent/maintainers
