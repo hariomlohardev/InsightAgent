@@ -5,7 +5,10 @@ from typing import Dict, Any, Optional
 from app.agent.prompts import SYSTEM_EXPLAINER_PROMPT
 from app.core.llm import get_llm
 
-def fallback_explain(query: str, result_json: Optional[Dict[str, Any]], error: Optional[str], profile: Dict[str, Any]) -> str:
+
+def fallback_explain(
+    query: str, result_json: Optional[Dict[str, Any]], error: Optional[str], profile: Dict[str, Any]
+) -> str:
     """Template-based insights when no LLM."""
     if error:
         # Simplify error
@@ -21,7 +24,7 @@ def fallback_explain(query: str, result_json: Optional[Dict[str, Any]], error: O
 
     lines = []
     lines.append(f"- Query '{query}' returned **{rows} rows** with columns: {', '.join(cols[:5])}.")
-    
+
     # Try to extract insight from data
     if data:
         # Assume first numeric column insight
@@ -42,21 +45,43 @@ def fallback_explain(query: str, result_json: Optional[Dict[str, Any]], error: O
                 # Use first numeric col
                 num_col = numeric_vals[0][0]
                 # Find max row
-                max_row = max(data, key=lambda r: float(str(r.get(num_col, 0)).replace(",", "")) if str(r.get(num_col, 0)).replace(".","",1).isdigit() else 0)
-                cat_col = [k for k in max_row.keys() if k != num_col][0] if len(max_row) > 1 else "item"
-                lines.append(f"- Highest **{num_col}** is **{max_row.get(num_col)}** for **{max_row.get(cat_col)}** (among top results).")
+                max_row = max(
+                    data,
+                    key=lambda r: (
+                        float(str(r.get(num_col, 0)).replace(",", ""))
+                        if str(r.get(num_col, 0)).replace(".", "", 1).isdigit()
+                        else 0
+                    ),
+                )
+                cat_col = (
+                    [k for k in max_row.keys() if k != num_col][0] if len(max_row) > 1 else "item"
+                )
+                lines.append(
+                    f"- Highest **{num_col}** is **{max_row.get(num_col)}** for **{max_row.get(cat_col)}** (among top results)."
+                )
             except Exception:
                 pass
 
     if rows > 1 and len(data) >= 2:
-        lines.append(f"- Showing top {min(rows, len(data))} results out of {rows} total. Chart visualizes the distribution.")
-    
+        lines.append(
+            f"- Showing top {min(rows, len(data))} results out of {rows} total. Chart visualizes the distribution."
+        )
+
     # Add tip
-    lines.append(f"- Tip: Ask follow-ups like 'why trend?' or 'show correlation' for deeper insights.")
+    lines.append(
+        f"- Tip: Ask follow-ups like 'why trend?' or 'show correlation' for deeper insights."
+    )
 
     return "\n".join(lines)
 
-async def explain(query: str, result_json: Optional[Dict[str, Any]], error: Optional[str], profile: Dict[str, Any], stdout: str = "") -> str:
+
+async def explain(
+    query: str,
+    result_json: Optional[Dict[str, Any]],
+    error: Optional[str],
+    profile: Dict[str, Any],
+    stdout: str = "",
+) -> str:
     """Use LLM if available else fallback. Supports all providers."""
     llm = get_llm()
     if not llm:
@@ -71,8 +96,12 @@ async def explain(query: str, result_json: Optional[Dict[str, Any]], error: Opti
         if stdout:
             result_summary += f"\nStdout: {stdout[:500]}"
 
-        profile_text = f"Dataset shape: {profile.get('shape')}, columns: {profile.get('column_names')}"
-        user_msg = f"User Query: {query}\nProfile: {profile_text}\n{result_summary}\n\nProvide insights:"
+        profile_text = (
+            f"Dataset shape: {profile.get('shape')}, columns: {profile.get('column_names')}"
+        )
+        user_msg = (
+            f"User Query: {query}\nProfile: {profile_text}\n{result_summary}\n\nProvide insights:"
+        )
 
         content = await llm.chat(
             SYSTEM_EXPLAINER_PROMPT,

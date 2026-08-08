@@ -6,14 +6,17 @@ from app.main import app
 
 client = TestClient(app)
 
+
 def _upload_dirty():
     # Create dirty df: duplicates, nulls, whitespace - ensure at least 1 clear duplicate
-    df = pd.DataFrame({
-        "Product": ["A", "A", "B", "B"],
-        "Sales": [100, 100, 100, 200],
-        "Price": [10, 10, 20, 20],
-        "Date": ["2024-01-01", "2024-01-01", "2024-01-02", "2024-01-03"]
-    })
+    df = pd.DataFrame(
+        {
+            "Product": ["A", "A", "B", "B"],
+            "Sales": [100, 100, 100, 200],
+            "Price": [10, 10, 20, 20],
+            "Date": ["2024-01-01", "2024-01-01", "2024-01-02", "2024-01-03"],
+        }
+    )
     tmp = tempfile.NamedTemporaryFile(suffix=".csv", delete=False, mode="w")
     df.to_csv(tmp.name, index=False)
     tmp_path = Path(tmp.name)
@@ -23,10 +26,13 @@ def _upload_dirty():
     assert r.status_code == 200
     return r.json()["id"]
 
+
 def test_preview_clean_remove_duplicates():
     dataset_id = _upload_dirty()
     try:
-        r = client.post(f"/api/datasets/{dataset_id}/preview-clean", json={"query": "remove duplicates"})
+        r = client.post(
+            f"/api/datasets/{dataset_id}/preview-clean", json={"query": "remove duplicates"}
+        )
         assert r.status_code == 200
         data = r.json()
         assert data["success"] is True
@@ -37,10 +43,14 @@ def test_preview_clean_remove_duplicates():
     finally:
         client.delete(f"/api/datasets/{dataset_id}")
 
+
 def test_preview_fill_nulls():
     dataset_id = _upload_dirty()
     try:
-        r = client.post(f"/api/datasets/{dataset_id}/preview-clean", json={"query": "fill missing Sales with median"})
+        r = client.post(
+            f"/api/datasets/{dataset_id}/preview-clean",
+            json={"query": "fill missing Sales with median"},
+        )
         assert r.status_code == 200
         data = r.json()
         assert data["success"] is True
@@ -49,15 +59,21 @@ def test_preview_fill_nulls():
     finally:
         client.delete(f"/api/datasets/{dataset_id}")
 
+
 def test_apply_and_version():
     dataset_id = _upload_dirty()
     try:
         # Preview first
-        r = client.post(f"/api/datasets/{dataset_id}/preview-clean", json={"query": "remove duplicates"})
+        r = client.post(
+            f"/api/datasets/{dataset_id}/preview-clean", json={"query": "remove duplicates"}
+        )
         preview = r.json()
         code = preview["code"]
         # Apply
-        r = client.post(f"/api/datasets/{dataset_id}/apply-clean", json={"query": "remove duplicates", "code": code})
+        r = client.post(
+            f"/api/datasets/{dataset_id}/apply-clean",
+            json={"query": "remove duplicates", "code": code},
+        )
         assert r.status_code == 200
         data = r.json()
         assert data["success"] is True
@@ -75,6 +91,7 @@ def test_apply_and_version():
     finally:
         client.delete(f"/api/datasets/{dataset_id}")
 
+
 def test_revert():
     dataset_id = _upload_dirty()
     try:
@@ -82,7 +99,9 @@ def test_revert():
         r = client.get(f"/api/datasets/{dataset_id}")
         orig_rows = r.json()["dataset"]["rows"]
         # Apply
-        r = client.post(f"/api/datasets/{dataset_id}/apply-clean", json={"query": "remove duplicates"})
+        r = client.post(
+            f"/api/datasets/{dataset_id}/apply-clean", json={"query": "remove duplicates"}
+        )
         assert r.json()["success"] is True
         # Revert to 0
         r = client.post(f"/api/datasets/{dataset_id}/revert", json={"version": 0})
@@ -93,6 +112,7 @@ def test_revert():
         assert r.json()["dataset"]["rows"] == orig_rows
     finally:
         client.delete(f"/api/datasets/{dataset_id}")
+
 
 def test_chat_cleaning_intent():
     dataset_id = _upload_dirty()
@@ -106,6 +126,7 @@ def test_chat_cleaning_intent():
         assert data.get("diff") is not None or data["result"] is not None
     finally:
         client.delete(f"/api/datasets/{dataset_id}")
+
 
 def test_wrangle_invalid_version():
     dataset_id = _upload_dirty()

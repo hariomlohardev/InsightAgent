@@ -8,6 +8,7 @@ from datetime import datetime
 from typing import List, Dict, Any, Optional
 import pandas as pd
 import logging
+
 logger = logging.getLogger(__name__)
 
 from app.config import get_storage_path, get_workspace_id, is_cloud
@@ -16,8 +17,10 @@ from app.config import get_storage_path, get_workspace_id, is_cloud
 try:
     from app.core.db import use_db as _use_db
 except Exception:
+
     def _use_db():  # type: ignore
         return False
+
 
 def _sync_db_url() -> str | None:
     url = os.getenv("DATABASE_URL", "").strip()
@@ -31,18 +34,22 @@ def _sync_db_url() -> str | None:
         return url.replace("postgresql+psycopg://", "postgresql://", 1)
     return url
 
+
 def _db_available() -> bool:
     try:
         return _use_db()
     except Exception:
         return False
 
+
 def _db_ensure():
     try:
         from app.core.db import init_db_sync
+
         init_db_sync()
     except Exception:
         pass
+
 
 def _db_save_meta(meta: Dict[str, Any]):
     """Insert/update dataset meta in DB when DB available. Returns True if written."""
@@ -52,12 +59,17 @@ def _db_save_meta(meta: Dict[str, Any]):
         _db_ensure()
         from app.core.db import get_sync_sessionmaker, DatasetRow
         from datetime import datetime as _dt
+
         sm = get_sync_sessionmaker()
         if sm is None:
             return False
         with sm() as s:
             # upsert
-            existing = s.get(DatasetRow, meta["id"]) if hasattr(s, "get") else s.query(DatasetRow).get(meta["id"])
+            existing = (
+                s.get(DatasetRow, meta["id"])
+                if hasattr(s, "get")
+                else s.query(DatasetRow).get(meta["id"])
+            )
             # fallback for sqlalchemy 2.0
             if existing is None:
                 try:
@@ -97,26 +109,37 @@ def _db_save_meta(meta: Dict[str, Any]):
         logger.debug(f"_db_save_meta failed: {e}")
         return False
 
+
 def _db_list_metas() -> List[Dict[str, Any]] | None:
     if not _db_available():
         return None
     try:
         _db_ensure()
         from app.core.db import get_sync_sessionmaker, DatasetRow
+
         sm = get_sync_sessionmaker()
         if sm is None:
             return None
         with sm() as s:
             from sqlalchemy import select
+
             # workspace filter when CLOUD=true
             ws = get_workspace_id() if is_cloud() else None
             try:
                 if ws and ws != "default":
-                    stmt = select(DatasetRow).where(DatasetRow.workspace_id == ws).order_by(DatasetRow.created_at.desc())
+                    stmt = (
+                        select(DatasetRow)
+                        .where(DatasetRow.workspace_id == ws)
+                        .order_by(DatasetRow.created_at.desc())
+                    )
                 else:
                     # when CLOUD true but ws default, still filter by workspace_id to isolate default
                     if is_cloud():
-                        stmt = select(DatasetRow).where(DatasetRow.workspace_id == ws).order_by(DatasetRow.created_at.desc())
+                        stmt = (
+                            select(DatasetRow)
+                            .where(DatasetRow.workspace_id == ws)
+                            .order_by(DatasetRow.created_at.desc())
+                        )
                     else:
                         stmt = select(DatasetRow).order_by(DatasetRow.created_at.desc())
                 rows = s.execute(stmt).scalars().all()
@@ -131,36 +154,43 @@ def _db_list_metas() -> List[Dict[str, Any]] | None:
                 if r.meta_json:
                     out.append(r.meta_json)
                 else:
-                    out.append({
-                        "id": r.id,
-                        "original_filename": r.original_filename,
-                        "rows": r.rows,
-                        "columns": r.columns,
-                        "column_names": r.column_names,
-                        "created_at": r.created_at.isoformat() if r.created_at else "",
-                        "owner": r.owner,
-                        "workspace_id": r.workspace_id,
-                    })
+                    out.append(
+                        {
+                            "id": r.id,
+                            "original_filename": r.original_filename,
+                            "rows": r.rows,
+                            "columns": r.columns,
+                            "column_names": r.column_names,
+                            "created_at": r.created_at.isoformat() if r.created_at else "",
+                            "owner": r.owner,
+                            "workspace_id": r.workspace_id,
+                        }
+                    )
             return out
     except Exception as e:
         logger.debug(f"_db_list_metas failed: {e}")
         return None
+
 
 def _db_get_meta(dataset_id: str) -> Dict[str, Any] | None:
     if not _db_available():
         return None
     try:
         from app.core.db import get_sync_sessionmaker, DatasetRow
+
         sm = get_sync_sessionmaker()
         if sm is None:
             return None
         with sm() as s:
             from sqlalchemy import select
+
             # Enforce workspace isolation when CLOUD=true
             ws = get_workspace_id() if is_cloud() else None
             try:
                 if is_cloud():
-                    stmt = select(DatasetRow).where((DatasetRow.id == dataset_id) & (DatasetRow.workspace_id == ws))
+                    stmt = select(DatasetRow).where(
+                        (DatasetRow.id == dataset_id) & (DatasetRow.workspace_id == ws)
+                    )
                 else:
                     stmt = select(DatasetRow).where(DatasetRow.id == dataset_id)
                 row = s.execute(stmt).scalar_one_or_none()
@@ -191,16 +221,19 @@ def _db_get_meta(dataset_id: str) -> Dict[str, Any] | None:
         logger.debug(f"_db_get_meta failed: {e}")
         return None
 
+
 def _db_delete_meta(dataset_id: str) -> bool | None:
     if not _db_available():
         return None
     try:
         from app.core.db import get_sync_sessionmaker, DatasetRow
+
         sm = get_sync_sessionmaker()
         if sm is None:
             return None
         with sm() as s:
             from sqlalchemy import select
+
             try:
                 stmt = select(DatasetRow).where(DatasetRow.id == dataset_id)
                 row = s.execute(stmt).scalar_one_or_none()
@@ -215,15 +248,18 @@ def _db_delete_meta(dataset_id: str) -> bool | None:
         logger.debug(f"_db_delete_meta failed: {e}")
         return None
 
+
 def _datasets_dir() -> Path:
     d = get_storage_path() / "datasets"
     d.mkdir(parents=True, exist_ok=True)
     return d
 
+
 def _conversations_dir() -> Path:
     d = get_storage_path() / "conversations"
     d.mkdir(parents=True, exist_ok=True)
     return d
+
 
 def _atomic_write_json(path: Path, data: Dict[str, Any], default=None):
     """Atomic write via tmp+rename."""
@@ -235,6 +271,7 @@ def _atomic_write_json(path: Path, data: Dict[str, Any], default=None):
         json.dump(data, f, **kwargs)
     tmp.replace(path)
 
+
 def save_dataset(file_path: Path, original_filename: str) -> str:
     """Copy file to storage and create meta. Returns dataset_id. Raises ValueError on parse errors."""
     dataset_id = str(uuid.uuid4())[:8]
@@ -242,7 +279,7 @@ def save_dataset(file_path: Path, original_filename: str) -> str:
     dest_dir.mkdir(parents=True, exist_ok=True)
     dest_file = dest_dir / "data.csv"
     suffix = file_path.suffix.lower()
-    
+
     # Handle different file types with robust error handling
     df = None
     if suffix in [".csv"]:
@@ -253,7 +290,11 @@ def save_dataset(file_path: Path, original_filename: str) -> str:
                 try:
                     df = pd.read_csv(file_path, encoding=encoding, sep=sep, nrows=5)
                     # Heuristic: if only 1 column and sep != ",", try next sep
-                    if len(df.columns) == 1 and sep == "," and "," in open(file_path, encoding=encoding).read(1024):
+                    if (
+                        len(df.columns) == 1
+                        and sep == ","
+                        and "," in open(file_path, encoding=encoding).read(1024)
+                    ):
                         continue
                     # Successfully read preview, now read full
                     df = pd.read_csv(file_path, encoding=encoding, sep=sep)
@@ -273,7 +314,7 @@ def save_dataset(file_path: Path, original_filename: str) -> str:
             df.to_csv(dest_file, index=False)
         else:
             raise ValueError(f"Could not parse CSV: {last_err}")
-    
+
     elif suffix in [".xlsx", ".xls"]:
         # Convert to csv for uniform handling, keep original too
         shutil.copy(file_path, dest_dir / f"original{suffix}")
@@ -295,7 +336,7 @@ def save_dataset(file_path: Path, original_filename: str) -> str:
         if df.empty:
             raise ValueError("Excel file is empty or has no data rows")
         df.to_csv(dest_file, index=False)
-    
+
     elif suffix in [".json"]:
         shutil.copy(file_path, dest_dir / "original.json")
         last_err = None
@@ -312,6 +353,7 @@ def save_dataset(file_path: Path, original_filename: str) -> str:
                 # Try raw json load
                 if df.empty:
                     import json as _json
+
                     with open(file_path) as f:
                         data = _json.load(f)
                     if isinstance(data, list) and len(data) > 0 and isinstance(data[0], dict):
@@ -331,7 +373,7 @@ def save_dataset(file_path: Path, original_filename: str) -> str:
         if df is None or df.empty:
             raise ValueError(f"Could not parse JSON: {last_err or 'empty or invalid format'}")
         df.to_csv(dest_file, index=False)
-    
+
     else:
         # Generic
         shutil.copy(file_path, dest_file)
@@ -350,7 +392,7 @@ def save_dataset(file_path: Path, original_filename: str) -> str:
         raise ValueError("File has no columns")
     if len(df.columns) > 1000:
         raise ValueError(f"Too many columns ({len(df.columns)}), max 1000")
-    
+
     # Load to get shape (already have df)
     try:
         rows = len(df)
@@ -373,7 +415,7 @@ def save_dataset(file_path: Path, original_filename: str) -> str:
         "workspace_id": get_workspace_id() if is_cloud() else "default",
     }
     _atomic_write_json(dest_dir / "meta.json", meta)
-    
+
     # L09 DB dual-write
     try:
         _db_save_meta(meta)
@@ -388,6 +430,7 @@ def save_dataset(file_path: Path, original_filename: str) -> str:
             # Try fsspec first (s3fs)
             try:
                 import fsspec
+
                 with fsspec.open(s3_path, mode="wt") as f:
                     df.to_csv(f, index=False)
                 with fsspec.open(f"s3://{bucket}/datasets/{dataset_id}/meta.json", mode="wt") as f:
@@ -400,17 +443,24 @@ def save_dataset(file_path: Path, original_filename: str) -> str:
                 try:
                     import boto3
                     import io
+
                     csv_buf = io.StringIO()
                     df.to_csv(csv_buf, index=False)
                     s3 = boto3.client("s3", region_name=os.getenv("AWS_REGION", "us-east-1"))
-                    s3.put_object(Bucket=bucket, Key=f"datasets/{dataset_id}/data.csv", Body=csv_buf.getvalue())
-                    s3.put_object(Bucket=bucket, Key=f"datasets/{dataset_id}/meta.json", Body=json.dumps(meta))
+                    s3.put_object(
+                        Bucket=bucket,
+                        Key=f"datasets/{dataset_id}/data.csv",
+                        Body=csv_buf.getvalue(),
+                    )
+                    s3.put_object(
+                        Bucket=bucket, Key=f"datasets/{dataset_id}/meta.json", Body=json.dumps(meta)
+                    )
                     wrote = True
                 except Exception as be:
                     logger.debug(f"S3 boto3 save failed: {be}")
     except Exception as e:
         logger.debug(f"S3 save failed, fs fallback ok: {e}")
-    
+
     # BF-04 parquet cache for re-read 60ms vs 205ms (only when >100k rows or >5MB)
     try:
         if rows > 100_000 or dest_file.stat().st_size > 5 * 1024 * 1024:
@@ -419,6 +469,7 @@ def save_dataset(file_path: Path, original_filename: str) -> str:
             except Exception:
                 try:
                     import pyarrow as pa, pyarrow.parquet as pq  # type: ignore
+
                     table = pa.Table.from_pandas(df)
                     pq.write_table(table, str(dest_dir / "data.parquet"))
                 except Exception:
@@ -430,10 +481,13 @@ def save_dataset(file_path: Path, original_filename: str) -> str:
     versions_dir = dest_dir / "versions"
     versions_dir.mkdir(exist_ok=True)
     shutil.copy(dest_file, versions_dir / "0.csv")
-    versions_meta = [{"version": 0, "op": "create", "prompt": "upload", "created_at": meta["created_at"]}]
+    versions_meta = [
+        {"version": 0, "op": "create", "prompt": "upload", "created_at": meta["created_at"]}
+    ]
     _atomic_write_json(versions_dir / "versions.json", versions_meta)
-    
+
     return dataset_id
+
 
 def list_datasets(q: str = None) -> List[Dict[str, Any]]:
     # L10 search: filter by filename ilike when q provided
@@ -444,19 +498,36 @@ def list_datasets(q: str = None) -> List[Dict[str, Any]]:
             _db_ensure()
             from app.core.db import get_sync_sessionmaker, DatasetRow
             from sqlalchemy import select
+
             sm = get_sync_sessionmaker()
             if sm is not None:
                 with sm() as s:
                     # ilike on original_filename
                     try:
                         # Use ilike for postgres, like for sqlite (case-insensitive)
-                        stmt = select(DatasetRow).where(DatasetRow.original_filename.ilike(f"%{q}%"))
+                        stmt = select(DatasetRow).where(
+                            DatasetRow.original_filename.ilike(f"%{q}%")
+                        )
                         rows = s.execute(stmt).scalars().all()
                     except Exception:
                         # fallback to python filter
                         rows = s.execute(select(DatasetRow)).scalars().all()
                         rows = [r for r in rows if q.lower() in (r.original_filename or "").lower()]
-                    out = [r.meta_json if r.meta_json else {"id": r.id, "original_filename": r.original_filename, "rows": r.rows, "columns": r.columns, "column_names": r.column_names, "created_at": r.created_at.isoformat() if r.created_at else ""} for r in rows]
+                    out = [
+                        (
+                            r.meta_json
+                            if r.meta_json
+                            else {
+                                "id": r.id,
+                                "original_filename": r.original_filename,
+                                "rows": r.rows,
+                                "columns": r.columns,
+                                "column_names": r.column_names,
+                                "created_at": r.created_at.isoformat() if r.created_at else "",
+                            }
+                        )
+                        for r in rows
+                    ]
                     out.sort(key=lambda x: x.get("created_at", ""), reverse=True)
                     return out
         except Exception as e:
@@ -467,7 +538,7 @@ def list_datasets(q: str = None) -> List[Dict[str, Any]]:
         # Merge + filter by q if needed
         if q:
             ql = q.lower()
-            db_metas = [m for m in db_metas if ql in (m.get("original_filename","") or "").lower()]
+            db_metas = [m for m in db_metas if ql in (m.get("original_filename", "") or "").lower()]
         else:
             # Merge DB + filesystem (DB is source of truth when enabled, but keep fs fallback for legacy)
             fs_ids = set()
@@ -480,7 +551,10 @@ def list_datasets(q: str = None) -> List[Dict[str, Any]]:
                             try:
                                 with open(mf) as f:
                                     data = json.load(f)
-                                if d / "data.csv" in [Path(data.get("file_path",""))] or (d / "data.csv").exists():
+                                if (
+                                    d / "data.csv" in [Path(data.get("file_path", ""))]
+                                    or (d / "data.csv").exists()
+                                ):
                                     fs_metas.append(data)
                                     fs_ids.add(data.get("id"))
                             except:
@@ -506,7 +580,7 @@ def list_datasets(q: str = None) -> List[Dict[str, Any]]:
                     with open(meta_file) as f:
                         data = json.load(f)
                     # L10 search filter
-                    if q and q.lower() not in (data.get("original_filename","") or "").lower():
+                    if q and q.lower() not in (data.get("original_filename", "") or "").lower():
                         continue
                     try:
                         fp = d / "data.csv"
@@ -522,6 +596,7 @@ def list_datasets(q: str = None) -> List[Dict[str, Any]]:
     datasets.sort(key=lambda x: x.get("created_at", ""), reverse=True)
     return datasets
 
+
 def get_dataset_meta(dataset_id: str) -> Optional[Dict[str, Any]]:
     # L09 DB first
     dbm = _db_get_meta(dataset_id)
@@ -531,6 +606,7 @@ def get_dataset_meta(dataset_id: str) -> Optional[Dict[str, Any]]:
     if _db_available() and os.getenv("STORAGE_BACKEND", "fs") == "s3" and os.getenv("S3_BUCKET"):
         try:
             import fsspec, json as _j
+
             bucket = os.getenv("S3_BUCKET")
             with fsspec.open(f"s3://{bucket}/datasets/{dataset_id}/meta.json", mode="rt") as f:
                 return _j.load(f)
@@ -552,6 +628,7 @@ def get_dataset_meta(dataset_id: str) -> Optional[Dict[str, Any]]:
     except json.JSONDecodeError:
         return None
 
+
 def get_dataset_path(dataset_id: str) -> Optional[Path]:
     meta = get_dataset_meta(dataset_id)
     if not meta:
@@ -564,6 +641,7 @@ def get_dataset_path(dataset_id: str) -> Optional[Path]:
         return alt
     return None
 
+
 def load_dataset_df(dataset_id: str, use_polars: bool = None) -> pd.DataFrame:
     # L09 S3 primary when STORAGE_BACKEND=s3, fallback to fs
     storage_backend = os.getenv("STORAGE_BACKEND", "fs")
@@ -573,6 +651,7 @@ def load_dataset_df(dataset_id: str, use_polars: bool = None) -> pd.DataFrame:
             # Try fsspec first
             try:
                 import fsspec
+
                 s3_path = f"s3://{bucket}/datasets/{dataset_id}/data.csv"
                 with fsspec.open(s3_path, mode="rt") as f:
                     return pd.read_csv(f)
@@ -581,6 +660,7 @@ def load_dataset_df(dataset_id: str, use_polars: bool = None) -> pd.DataFrame:
             # Fallback to boto3
             try:
                 import boto3, io
+
                 s3 = boto3.client("s3", region_name=os.getenv("AWS_REGION", "us-east-1"))
                 obj = s3.get_object(Bucket=bucket, Key=f"datasets/{dataset_id}/data.csv")
                 body = obj["Body"].read().decode("utf-8")
@@ -593,6 +673,7 @@ def load_dataset_df(dataset_id: str, use_polars: bool = None) -> pd.DataFrame:
     if meta and meta.get("type") == "connector":
         try:
             from app.services.connector_service import fetch_connector_df
+
             return fetch_connector_df(dataset_id, limit=5000)
         except Exception as e:
             p_fallback = _datasets_dir() / dataset_id / "data.csv"
@@ -607,10 +688,11 @@ def load_dataset_df(dataset_id: str, use_polars: bool = None) -> pd.DataFrame:
         raise FileNotFoundError(f"Dataset {dataset_id} not found")
     # Polars fast path (10M <2s via scan_csv) + chunked pandas fallback
     if use_polars is None:
-        use_polars = os.getenv("USE_POLARS", "false").lower() in ("true","1","yes")
+        use_polars = os.getenv("USE_POLARS", "false").lower() in ("true", "1", "yes")
     if use_polars:
         try:
             import polars as pl
+
             # BF-02: parquet fast path 60ms vs csv 205ms, streaming 39ms vs scan 205ms
             pq = p.parent / "data.parquet"
             if pq.exists():
@@ -625,7 +707,9 @@ def load_dataset_df(dataset_id: str, use_polars: bool = None) -> pd.DataFrame:
                         pass
             # streaming CSV read
             try:
-                df_pl = pl.scan_csv(str(p), infer_schema_length=1000, try_parse_dates=True).collect(streaming=True)
+                df_pl = pl.scan_csv(str(p), infer_schema_length=1000, try_parse_dates=True).collect(
+                    streaming=True
+                )
                 return df_pl.to_pandas()
             except TypeError as e:
                 # older polars without streaming kw
@@ -671,6 +755,7 @@ def load_dataset_df(dataset_id: str, use_polars: bool = None) -> pd.DataFrame:
             return pd.read_excel(orig_xls)
         raise
 
+
 def delete_dataset(dataset_id: str) -> bool:
     # L09 DB first
     db_res = _db_delete_meta(dataset_id)
@@ -678,6 +763,7 @@ def delete_dataset(dataset_id: str) -> bool:
     if os.getenv("STORAGE_BACKEND", "fs") == "s3" and os.getenv("S3_BUCKET"):
         try:
             import fsspec
+
             bucket = os.getenv("S3_BUCKET")
             s3_path = f"s3://{bucket}/datasets/{dataset_id}/data.csv"
             fs = fsspec.filesystem("s3")
@@ -696,6 +782,7 @@ def delete_dataset(dataset_id: str) -> bool:
         if meta and meta.get("type") == "connector":
             try:
                 from app.config import get_storage_path as _gsp
+
                 c_path = _gsp() / "connectors" / f"{dataset_id}.json"
                 if c_path.exists():
                     c_path.unlink()
@@ -714,6 +801,7 @@ def delete_dataset(dataset_id: str) -> bool:
         except (PermissionError, OSError):
             try:
                 import stat
+
                 for root, dirs, files in os.walk(d):
                     for f in files:
                         try:
@@ -729,11 +817,15 @@ def delete_dataset(dataset_id: str) -> bool:
         return True
     return False if not existed else True
 
+
 # Conversations with L1.5 polish: quota, pagination, delete, atomic
 
 MAX_CONVERSATIONS_PER_DATASET = 50
 
-def save_conversation_message(dataset_id: str, conversation_id: str, role: str, content: Dict[str, Any]) -> str:
+
+def save_conversation_message(
+    dataset_id: str, conversation_id: str, role: str, content: Dict[str, Any]
+) -> str:
     """Append message to conversation file. Returns conversation_id. Atomic write."""
     if not conversation_id:
         conversation_id = str(uuid.uuid4())[:8]
@@ -747,25 +839,23 @@ def save_conversation_message(dataset_id: str, conversation_id: str, role: str, 
                 "id": conversation_id,
                 "dataset_id": dataset_id,
                 "created_at": datetime.utcnow().isoformat(),
-                "messages": []
+                "messages": [],
             }
     else:
         conv = {
             "id": conversation_id,
             "dataset_id": dataset_id,
             "created_at": datetime.utcnow().isoformat(),
-            "messages": []
+            "messages": [],
         }
-    msg = {
-        "role": role,
-        "timestamp": datetime.utcnow().isoformat(),
-        **content
-    }
+    msg = {"role": role, "timestamp": datetime.utcnow().isoformat(), **content}
     conv["messages"].append(msg)
     conv["updated_at"] = datetime.utcnow().isoformat()
     conv["dataset_id"] = dataset_id  # ensure
+
     def _default(o):
         import numpy as np
+
         if isinstance(o, np.ndarray):
             return o.tolist()
         if isinstance(o, (np.integer,)):
@@ -775,22 +865,26 @@ def save_conversation_message(dataset_id: str, conversation_id: str, role: str, 
         if isinstance(o, (np.bool_,)):
             return bool(o)
         return str(o)
+
     _atomic_write_json(conv_file, conv, default=_default)
-    
+
     # Enforce quota: keep only last 50 conversations per dataset (LRU)
     try:
         convs = list_conversations(dataset_id)
         if len(convs) > MAX_CONVERSATIONS_PER_DATASET:
             # Delete oldest
-            to_delete = sorted(convs, key=lambda x: x.get("updated_at", ""))[:len(convs)-MAX_CONVERSATIONS_PER_DATASET]
+            to_delete = sorted(convs, key=lambda x: x.get("updated_at", ""))[
+                : len(convs) - MAX_CONVERSATIONS_PER_DATASET
+            ]
             for c in to_delete:
                 f = _conversations_dir() / f"{c['id']}.json"
                 if f.exists():
                     f.unlink()
     except Exception:
         pass
-    
+
     return conversation_id
+
 
 def get_conversation(conversation_id: str) -> Optional[Dict[str, Any]]:
     f = _conversations_dir() / f"{conversation_id}.json"
@@ -806,7 +900,10 @@ def get_conversation(conversation_id: str) -> Optional[Dict[str, Any]]:
             pass
         return None
 
-def list_conversations(dataset_id: Optional[str] = None, limit: int = 100, offset: int = 0) -> List[Dict[str, Any]]:
+
+def list_conversations(
+    dataset_id: Optional[str] = None, limit: int = 100, offset: int = 0
+) -> List[Dict[str, Any]]:
     convs = []
     for f in _conversations_dir().glob("*.json"):
         try:
@@ -824,7 +921,8 @@ def list_conversations(dataset_id: Optional[str] = None, limit: int = 100, offse
             convs.append(c)
     convs.sort(key=lambda x: x.get("updated_at", x.get("created_at", "")), reverse=True)
     # Pagination
-    return convs[offset:offset+limit]
+    return convs[offset : offset + limit]
+
 
 def delete_conversation(conversation_id: str) -> bool:
     f = _conversations_dir() / f"{conversation_id}.json"
@@ -832,6 +930,7 @@ def delete_conversation(conversation_id: str) -> bool:
         f.unlink()
         return True
     return False
+
 
 # Versions helpers for L2 but prepared
 def list_versions(dataset_id: str) -> List[Dict[str, Any]]:
@@ -844,11 +943,13 @@ def list_versions(dataset_id: str) -> List[Dict[str, Any]]:
     except:
         return []
 
+
 def get_version_path(dataset_id: str, version: int) -> Optional[Path]:
     p = _datasets_dir() / dataset_id / "versions" / f"{version}.csv"
     if p.exists():
         return p
     return None
+
 
 def create_version(dataset_id: str, df: pd.DataFrame, op: str, prompt: str, code: str) -> int:
     """Save df as new version, update versions.json and meta.current_version. Returns new version number. Max 20 versions."""
@@ -857,20 +958,20 @@ def create_version(dataset_id: str, df: pd.DataFrame, op: str, prompt: str, code
     versions_dir = dest_dir / "versions"
     versions_dir.mkdir(parents=True, exist_ok=True)
     vfile = versions_dir / "versions.json"
-    
+
     # Load existing
     versions = list_versions(dataset_id)
     next_version = (max([v["version"] for v in versions]) + 1) if versions else 1
     if versions and next_version == 0:
         next_version = 1
-    
+
     # Save df
     dest_file = versions_dir / f"{next_version}.csv"
     df.to_csv(dest_file, index=False)
     # Also update main data.csv
     main_file = dest_dir / "data.csv"
     df.to_csv(main_file, index=False)
-    
+
     # Update versions.json
     new_entry = {
         "version": next_version,
@@ -889,7 +990,7 @@ def create_version(dataset_id: str, df: pd.DataFrame, op: str, prompt: str, code
         rest = [v for v in versions if v["version"] != 0]
         rest.sort(key=lambda x: x["version"])
         # Keep last max_versions-1 (since v0 is extra)
-        rest = rest[-(max_versions-1):]
+        rest = rest[-(max_versions - 1) :]
         versions = sorted(v0 + rest, key=lambda x: x["version"])
         # Delete old files
         keep_versions = {v["version"] for v in versions}
@@ -900,9 +1001,9 @@ def create_version(dataset_id: str, df: pd.DataFrame, op: str, prompt: str, code
                     f.unlink()
             except:
                 pass
-    
+
     _atomic_write_json(vfile, versions)
-    
+
     # Update meta
     meta = get_dataset_meta(dataset_id)
     if meta:
@@ -911,8 +1012,9 @@ def create_version(dataset_id: str, df: pd.DataFrame, op: str, prompt: str, code
         meta["columns"] = int(df.shape[1])
         meta["column_names"] = [str(c) for c in df.columns.tolist()]
         _atomic_write_json(dest_dir / "meta.json", meta)
-    
+
     return next_version
+
 
 def revert_to_version(dataset_id: str, version: int) -> bool:
     """Revert data.csv to versions/{version}.csv, update meta.current_version. Returns success."""
@@ -931,7 +1033,7 @@ def revert_to_version(dataset_id: str, version: int) -> bool:
             meta["current_version"] = version
             _atomic_write_json(dest_dir / "meta.json", meta)
         return True
-    
+
     df.to_csv(main_file, index=False)
     # Also save as new version? No, just revert pointer
     meta = get_dataset_meta(dataset_id)

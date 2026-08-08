@@ -1,17 +1,21 @@
 """Bench chat groupby <2s."""
+
 import time
 import pandas as pd
 import numpy as np
 from pathlib import Path
 
+
 def bench_chat(rows: int = 1_000_000):
     # Generate 1M sales-like df
     print(f"Generating {rows} rows for chat bench...")
-    df = pd.DataFrame({
-        "Region": np.random.choice(["A","B","C","D"], rows),
-        "Sales": np.random.randn(rows) * 1000 + 5000,
-        "Category": np.random.choice(["X","Y","Z"], rows),
-    })
+    df = pd.DataFrame(
+        {
+            "Region": np.random.choice(["A", "B", "C", "D"], rows),
+            "Sales": np.random.randn(rows) * 1000 + 5000,
+            "Category": np.random.choice(["X", "Y", "Z"], rows),
+        }
+    )
     # Simulate chat groupby (what chat does for 'sales by region')
     start = time.time()
     res = df.groupby("Region")["Sales"].sum().reset_index()
@@ -20,6 +24,7 @@ def bench_chat(rows: int = 1_000_000):
     # Also via duckdb
     try:
         import duckdb
+
         start2 = time.time()
         con = duckdb.connect()
         con.register("df", df)
@@ -31,8 +36,10 @@ def bench_chat(rows: int = 1_000_000):
         print(f"DuckDB not available: {e}")
         return ms
 
+
 if __name__ == "__main__":
     import argparse
+
     ap = argparse.ArgumentParser()
     ap.add_argument("--rows", type=int, default=1_000_000)
     args = ap.parse_args()

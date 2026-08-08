@@ -12,6 +12,7 @@ from app.core.storage import _atomic_write_json
 
 JWT_ALG = "HS256"
 
+
 def _jwt_secret() -> str:
     # Prefer env
     sec = os.getenv("JWT_SECRET")
@@ -32,27 +33,33 @@ def _jwt_secret() -> str:
         pass
     return new_sec
 
+
 def _users_dir() -> Path:
     d = get_storage_path() / "users"
     d.mkdir(parents=True, exist_ok=True)
     return d
+
 
 def _api_keys_dir() -> Path:
     d = get_storage_path() / "api_keys"
     d.mkdir(parents=True, exist_ok=True)
     return d
 
+
 def _user_path(uid: str) -> Path:
     return _users_dir() / f"{uid}.json"
 
+
 def _api_key_path(hashed: str) -> Path:
     return _api_keys_dir() / f"{hashed}.json"
+
 
 def hash_password(password: str) -> str:
     # pbkdf2_hmac with sha256 + salt (avoid bcrypt dep for OSS)
     salt = secrets.token_bytes(16)
     dk = hashlib.pbkdf2_hmac("sha256", password.encode(), salt, 100000)
     return base64.b64encode(salt + dk).decode()
+
 
 def verify_password(password: str, hashed: str) -> bool:
     try:
@@ -64,9 +71,12 @@ def verify_password(password: str, hashed: str) -> bool:
     except:
         return False
 
+
 def hmac_compare(a: bytes, b: bytes) -> bool:
     import hmac as _hmac
+
     return _hmac.compare_digest(a, b)
+
 
 def list_users():
     out = []
@@ -78,6 +88,7 @@ def list_users():
             continue
     return out
 
+
 def get_user_by_id(uid: str) -> Optional[Dict[str, Any]]:
     p = _user_path(uid)
     if not p.exists():
@@ -88,30 +99,36 @@ def get_user_by_id(uid: str) -> Optional[Dict[str, Any]]:
     except:
         return None
 
+
 def get_user_by_email(email: str) -> Optional[Dict[str, Any]]:
     email = email.lower().strip()
     for u in list_users():
-        if u.get("email","").lower() == email:
+        if u.get("email", "").lower() == email:
             return u
     return None
 
-def create_user(email: str, password: str, role: str = "viewer", name: str = "", workspace_id: str = None) -> Dict[str, Any]:
+
+def create_user(
+    email: str, password: str, role: str = "viewer", name: str = "", workspace_id: str = None
+) -> Dict[str, Any]:
     email = email.lower().strip()
     if not email or "@" not in email:
         raise ValueError("Invalid email")
     if get_user_by_email(email):
         raise ValueError("Email already registered")
-    if role not in ("admin","editor","viewer"):
+    if role not in ("admin", "editor", "viewer"):
         raise ValueError("role must be admin|editor|viewer")
     # first user is admin auto
     users = list_users()
     if not users:
         role = "admin"
     import uuid
+
     uid = str(uuid.uuid4())[:8]
     # workspace handling for cloud
     try:
         from app.config import get_workspace_id, is_cloud, get_base_storage_path
+
         if workspace_id is None and is_cloud():
             workspace_id = get_workspace_id()
     except:
@@ -130,15 +147,17 @@ def create_user(email: str, password: str, role: str = "viewer", name: str = "",
     _atomic_write_json(_user_path(uid), user)
     return user
 
+
 def update_user_role(uid: str, role: str) -> Optional[Dict[str, Any]]:
     u = get_user_by_id(uid)
     if not u:
         return None
-    if role not in ("admin","editor","viewer"):
+    if role not in ("admin", "editor", "viewer"):
         raise ValueError("role must be admin|editor|viewer")
     u["role"] = role
     _atomic_write_json(_user_path(uid), u)
     return u
+
 
 def seed_admin():
     # idempotent - called on startup
@@ -154,27 +173,52 @@ def seed_admin():
         # already exists
         return None
 
+
 def create_jwt(user: Dict[str, Any], exp_hours: int = 24) -> str:
     secret = _jwt_secret()
     ws_id = user.get("workspace_id") or "default"
     try:
         from jose import jwt
+
         exp = datetime.now(timezone.utc) + timedelta(hours=exp_hours)
-        payload = {"sub": user["id"], "email": user.get("email"), "role": user.get("role","viewer"), "ws_id": ws_id, "exp": int(exp.timestamp())}
+        payload = {
+            "sub": user["id"],
+            "email": user.get("email"),
+            "role": user.get("role", "viewer"),
+            "ws_id": ws_id,
+            "exp": int(exp.timestamp()),
+        }
         return jwt.encode(payload, secret, algorithm=JWT_ALG)
     except ImportError:
         # Fallback: simple base64 without sig verification (for OSS without dep) — still works for tests
         import base64, json as _j
-        header = base64.urlsafe_b64encode(_j.dumps({"alg":"HS256","typ":"JWT"}).encode()).decode().rstrip("=")
-        payload = {"sub": user["id"], "email": user.get("email"), "role": user.get("role","viewer"), "ws_id": ws_id, "exp": int((datetime.now(timezone.utc) + timedelta(hours=exp_hours)).timestamp())}
+
+        header = (
+            base64.urlsafe_b64encode(_j.dumps({"alg": "HS256", "typ": "JWT"}).encode())
+            .decode()
+            .rstrip("=")
+        )
+        payload = {
+            "sub": user["id"],
+            "email": user.get("email"),
+            "role": user.get("role", "viewer"),
+            "ws_id": ws_id,
+            "exp": int((datetime.now(timezone.utc) + timedelta(hours=exp_hours)).timestamp()),
+        }
         pay_b = base64.urlsafe_b64encode(_j.dumps(payload).encode()).decode().rstrip("=")
-        sig = base64.urlsafe_b64encode(hashlib.sha256(f"{header}.{pay_b}.{secret}".encode()).digest()).decode().rstrip("=")
+        sig = (
+            base64.urlsafe_b64encode(hashlib.sha256(f"{header}.{pay_b}.{secret}".encode()).digest())
+            .decode()
+            .rstrip("=")
+        )
         return f"{header}.{pay_b}.{sig}"
+
 
 def decode_jwt(token: str) -> Optional[Dict[str, Any]]:
     secret = _jwt_secret()
     try:
         from jose import jwt as _jwt, JWTError
+
         try:
             data = _jwt.decode(token, secret, algorithms=[JWT_ALG])
             return data
@@ -184,13 +228,16 @@ def decode_jwt(token: str) -> Optional[Dict[str, Any]]:
         # Fallback verification for non-jose token
         try:
             import base64, json as _j
+
             parts = token.split(".")
             if len(parts) != 3:
                 return None
             header_b, pay_b, sig = parts
+
             # pad
             def _pad(s):
                 return s + "=" * (-len(s) % 4)
+
             payload_json = base64.urlsafe_b64decode(_pad(pay_b)).decode()
             data = _j.loads(payload_json)
             # check exp
@@ -199,13 +246,21 @@ def decode_jwt(token: str) -> Optional[Dict[str, Any]]:
                 return None
             # verify sig
             header_b_check = header_b
-            expected_sig = base64.urlsafe_b64encode(hashlib.sha256(f"{header_b_check}.{pay_b}.{secret}".encode()).digest()).decode().rstrip("=")
+            expected_sig = (
+                base64.urlsafe_b64encode(
+                    hashlib.sha256(f"{header_b_check}.{pay_b}.{secret}".encode()).digest()
+                )
+                .decode()
+                .rstrip("=")
+            )
             import hmac as _hm
+
             if not _hm.compare_digest(expected_sig, sig):
                 return None
             return data
         except:
             return None
+
 
 def create_api_key(user_id: str, name: str = "", scopes: str = "read") -> Dict[str, Any]:
     user = get_user_by_id(user_id)
@@ -228,6 +283,7 @@ def create_api_key(user_id: str, name: str = "", scopes: str = "read") -> Dict[s
     ak_with_raw = {**ak, "raw": raw, "api_key": raw}
     return ak_with_raw
 
+
 def get_api_key_by_raw(raw: str) -> Optional[Dict[str, Any]]:
     hashed = hashlib.sha256(raw.encode()).hexdigest()[:24]
     p = _api_key_path(hashed)
@@ -238,6 +294,7 @@ def get_api_key_by_raw(raw: str) -> Optional[Dict[str, Any]]:
             return json.load(f)
     except:
         return None
+
 
 def delete_api_key(hashed_or_id: str) -> bool:
     # Try id prefix
@@ -265,29 +322,39 @@ def delete_api_key(hashed_or_id: str) -> bool:
         return True
     return False
 
+
 def list_api_keys(user_id: str = None):
     out = []
     for f in _api_keys_dir().glob("*.json"):
         try:
             with open(f) as jf:
                 data = json.load(jf)
-                if user_id is None or data.get("user_id")==user_id:
+                if user_id is None or data.get("user_id") == user_id:
                     out.append(data)
         except:
             continue
     return out
 
+
 # L8 workspace helpers
 def ensure_workspace(ws_id: str, name: str = "", owner_id: str = "") -> Path:
     from app.config import get_base_storage_path
+
     base = get_base_storage_path() / "workspaces" / ws_id
     base.mkdir(parents=True, exist_ok=True)
-    for sub in ["datasets","dashboards","schedules","reports","conversations","audit","jobs"]:
+    for sub in ["datasets", "dashboards", "schedules", "reports", "conversations", "audit", "jobs"]:
         (base / sub).mkdir(parents=True, exist_ok=True)
     meta_p = base / "meta.json"
     if not meta_p.exists():
         import uuid as _uuid
-        meta = {"id": ws_id, "name": name or ws_id, "owner_user_id": owner_id, "plan": "free", "created_at": datetime.now(timezone.utc).isoformat()}
+
+        meta = {
+            "id": ws_id,
+            "name": name or ws_id,
+            "owner_user_id": owner_id,
+            "plan": "free",
+            "created_at": datetime.now(timezone.utc).isoformat(),
+        }
         _atomic_write_json(meta_p, meta)
     else:
         try:
@@ -298,12 +365,22 @@ def ensure_workspace(ws_id: str, name: str = "", owner_id: str = "") -> Path:
     # billing.json
     b_p = base / "billing.json"
     if not b_p.exists():
-        billing = {"workspace_id": ws_id, "plan": "free", "status": "active", "stripe_customer_id": None, "created_at": datetime.now(timezone.utc).isoformat(), "queries_this_month": 0, "last_reset": datetime.now(timezone.utc).isoformat()}
+        billing = {
+            "workspace_id": ws_id,
+            "plan": "free",
+            "status": "active",
+            "stripe_customer_id": None,
+            "created_at": datetime.now(timezone.utc).isoformat(),
+            "queries_this_month": 0,
+            "last_reset": datetime.now(timezone.utc).isoformat(),
+        }
         _atomic_write_json(b_p, billing)
     return base
 
+
 def get_workspace_meta(ws_id: str) -> Optional[Dict[str, Any]]:
     from app.config import get_base_storage_path
+
     p = get_base_storage_path() / "workspaces" / ws_id / "meta.json"
     if not p.exists():
         return None
@@ -313,8 +390,10 @@ def get_workspace_meta(ws_id: str) -> Optional[Dict[str, Any]]:
     except:
         return None
 
+
 def list_workspaces() -> list:
     from app.config import get_base_storage_path
+
     base = get_base_storage_path() / "workspaces"
     if not base.exists():
         return []

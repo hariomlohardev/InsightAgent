@@ -7,13 +7,26 @@ from app.agent.prompts import SYSTEM_CODER_PROMPT
 from app.core.profiling import get_profile_summary_text
 from app.core.llm import get_llm, extract_json
 
+
 def _is_write_sql(q_lower: str) -> bool:
-    blocked = ["insert ", "update ", "delete ", "drop ", "create ", "alter ", "truncate ", "grant ", "revoke "]
+    blocked = [
+        "insert ",
+        "update ",
+        "delete ",
+        "drop ",
+        "create ",
+        "alter ",
+        "truncate ",
+        "grant ",
+        "revoke ",
+    ]
     return any(b in q_lower for b in blocked)
+
 
 def _sql_to_pandas_fallback_hint(sql: str) -> str:
     # Small hint for when LLM not available for NL→SQL
     return "Tip: Add OPENAI_API_KEY/GROQ_API_KEY for NL→SQL, or type raw SQL like SELECT * FROM df WHERE ..."
+
 
 def fallback_coder(query: str, profile: Dict[str, Any]) -> Dict[str, str]:
     """Rule-based coder covering 15+ common patterns + SQL branch for L4. No LLM needed."""
@@ -31,7 +44,7 @@ def fallback_coder(query: str, profile: Dict[str, Any]) -> Dict[str, str]:
             # Attempt lightweight NL->SQL: top 5 sales -> SELECT * FROM df ORDER BY sales DESC LIMIT 5
             # We'll just do fallback that selects head and gives hint
             pass  # fall through to SQL handler after we set q to SELECT if possible
-    
+
     # Helpers to find best column
     def find_col(keywords, candidates):
         # Find column that contains any keyword
@@ -66,14 +79,16 @@ def fallback_coder(query: str, profile: Dict[str, Any]) -> Dict[str, str]:
         where_match = re.search(r"where\s+(.+)", sql, re.IGNORECASE)
         if where_match:
             where_clause = where_match.group(1).strip()
-            where_clause = re.split(r"\s+limit\s+|\s+order\s+by\s+|\s+group\s+by\s+", where_clause, flags=re.IGNORECASE)[0].strip()
+            where_clause = re.split(
+                r"\s+limit\s+|\s+order\s+by\s+|\s+group\s+by\s+", where_clause, flags=re.IGNORECASE
+            )[0].strip()
             where_escaped = where_clause.replace("'", "\\'")
             code = f"duckdb.register('df', df)\ntry:\n    result = duckdb.query('''{sql}''').to_df()\nexcept Exception:\n    try:\n        result = df.query('{where_escaped}', engine='python')\n    except Exception:\n        result = df.head(20)\nfig = px.bar(result.head(20), x=result.columns[0] if len(result.columns)>0 else 'x', y=result.columns[1] if len(result.columns)>1 else result.columns[0], title='SQL Result')"
         else:
             code = f"duckdb.register('df', df)\ntry:\n    result = duckdb.query('''{sql}''').to_df()\nexcept Exception:\n    result = df.head(20)\nfig = px.bar(result.head(20), x=result.columns[0] if len(result.columns)>0 else 'x', y=result.columns[1] if len(result.columns)>1 else result.columns[0], title='SQL Result')"
         explanation = f"Executed SQL: {sql[:60]}"
         return {"code": code, "explanation": explanation}
-    
+
     # 0a. L4 NL→SQL for connectors: if intent is sql but query is not raw SQL, try LLM translation or heuristic
     # This path is also handled in generate_code (LLM branch) but we provide heuristic fallback here
     if profile.get("_intent") == "sql" or intent_hint == "sql":
@@ -92,7 +107,10 @@ def fallback_coder(query: str, profile: Dict[str, Any]) -> Dict[str, str]:
     # We handle analytics via explicit intent or keyword, highest after SQL
 
     # Forecast — e.g., "forecast sales for next 3 months", "predict sales"
-    if any(k in q for k in ["forecast", "predict"]) or (("next" in q and any(w in q for w in ["month","week","day"])) and any(c.lower() in q for c in cols + numeric_cols)):
+    if any(k in q for k in ["forecast", "predict"]) or (
+        ("next" in q and any(w in q for w in ["month", "week", "day"]))
+        and any(c.lower() in q for c in cols + numeric_cols)
+    ):
         # Parse periods and freq
         periods = 3
         m = re.search(r"next\s+(\d+)", q)
@@ -221,15 +239,17 @@ def fallback_coder(query: str, profile: Dict[str, Any]) -> Dict[str, str]:
 
     # Backfill: add to dashboard_service comments migration? no-op
     # Why / explain drop/increase — e.g., "why did sales drop in March?"
-    if any(k in q for k in ["why", "explain", "reason"]) or (any(w in q for w in ["drop","increase","decrease","fall","rise"]) and "?" in query):
-        safe_q = query.replace("'", r"\'").replace("\n"," ").replace("'''","'")[:500]
+    if any(k in q for k in ["why", "explain", "reason"]) or (
+        any(w in q for w in ["drop", "increase", "decrease", "fall", "rise"]) and "?" in query
+    ):
+        safe_q = query.replace("'", r"\'").replace("\n", " ").replace("'''", "'")[:500]
         code = f"result = analyze_why(df, {repr(profile)}, '''{safe_q}''')\nfig = px.bar(result, x='category', y='delta', title='Why analysis: delta by category (top contributors)', color='delta', color_continuous_scale='RdBu')"
         explanation = f"Why analysis via cohort diff"
         return {"code": code, "explanation": explanation}
     # Also fallback: if intent is analytics and query is drop/increase without why but analytics planner flagged
     if profile.get("_intent") == "analytics" or intent_hint == "analytics":
-        if any(w in q for w in ["drop","increase","fall","rise","decrease"]):
-            safe_q = query.replace("'", r"\'").replace("\n"," ").replace("'''","'")[:500]
+        if any(w in q for w in ["drop", "increase", "fall", "rise", "decrease"]):
+            safe_q = query.replace("'", r"\'").replace("\n", " ").replace("'''", "'")[:500]
             code = f"result = analyze_why(df, {repr(profile)}, '''{safe_q}''')\nfig = px.bar(result, x='category', y='delta', title='Why analysis: delta by category', color='delta', color_continuous_scale='RdBu')"
             explanation = "Why analysis (cohort diff)"
             return {"code": code, "explanation": explanation}
@@ -244,9 +264,22 @@ def fallback_coder(query: str, profile: Dict[str, Any]) -> Dict[str, str]:
     # 0b. Cleaning / Wrangling (Level 2) - 12 intents, preview mode (result = cleaned df)
     # Order matters: cleaning before other groupby to avoid misrouting
     # Detect cleaning via keywords
-    cleaning_keywords = ["clean", "remove", "fill", "drop", "rename", "convert", "trim", "standardize", "split", "merge", "pivot", "melt"]
+    cleaning_keywords = [
+        "clean",
+        "remove",
+        "fill",
+        "drop",
+        "rename",
+        "convert",
+        "trim",
+        "standardize",
+        "split",
+        "merge",
+        "pivot",
+        "melt",
+    ]
     is_cleaning = any(k in q for k in cleaning_keywords) or "fill" in q or "trim" in q
-    
+
     # Use helper to find column by fuzzy match
     def _find_col_fuzzy(word: str, candidates):
         word = word.lower().strip()
@@ -257,7 +290,7 @@ def fallback_coder(query: str, profile: Dict[str, Any]) -> Dict[str, str]:
                 return c
         # Try singular/plural
         for c in candidates:
-            if word.rstrip('s') == c.lower().rstrip('s'):
+            if word.rstrip("s") == c.lower().rstrip("s"):
                 return c
         return None
 
@@ -281,7 +314,7 @@ def fallback_coder(query: str, profile: Dict[str, Any]) -> Dict[str, str]:
                 code = f"result = df.drop_duplicates()\nfig = px.bar(pd.DataFrame({{'metric':['before','after'], 'value':[len(df), len(result)]}}), x='metric', y='value', title='Duplicates removed')"
                 explanation = "Removed duplicates"
             return {"code": code, "explanation": explanation}
-        
+
         # 2. Fill nulls
         if "fill" in q and ("null" in q or "missing" in q or "na" in q or "nan" in q):
             # Find column
@@ -304,7 +337,7 @@ def fallback_coder(query: str, profile: Dict[str, Any]) -> Dict[str, str]:
                 strategy = "bfill"
             elif "zero" in q:
                 strategy = "zero"
-            
+
             if col:
                 if strategy == "median":
                     code = f"result = df.copy()\nresult['{col}'] = result['{col}'].fillna(result['{col}'].median())\nfig = px.bar(pd.DataFrame({{'metric':['nulls_before','nulls_after'], 'value':[df['{col}'].isna().sum(), result['{col}'].isna().sum()]}}), x='metric', y='value', title='Filled nulls in {col} with median')"
@@ -327,7 +360,7 @@ def fallback_coder(query: str, profile: Dict[str, Any]) -> Dict[str, str]:
                     code = f"result = df.copy()\nfor col in result.select_dtypes(include=['number']).columns:\n    result[col] = result[col].fillna(result[col].mean())\nfig = px.bar(pd.DataFrame({{'metric':['nulls_before','nulls_after'], 'value':[df.isna().sum().sum(), result.isna().sum().sum()]}}), x='metric', y='value', title='Filled nulls')"
                 explanation = f"Filled nulls with {strategy}"
             return {"code": code, "explanation": explanation}
-        
+
         # 3. Drop rows/columns
         if "drop" in q:
             # Drop column
@@ -362,7 +395,7 @@ def fallback_coder(query: str, profile: Dict[str, Any]) -> Dict[str, str]:
                     code = f"result = df.query('not ({cond})', engine='python')\nfig = px.bar(pd.DataFrame({{'metric':['rows_before','rows_after'], 'value':[len(df), len(result)]}}), x='metric', y='value', title='Dropped rows where {cond}')"
                     explanation = f"Dropped rows where {cond}"
                     return {"code": code, "explanation": explanation}
-        
+
         # 4. Rename
         if "rename" in q:
             # Pattern: rename A to B, or rename column A to B
@@ -385,9 +418,15 @@ def fallback_coder(query: str, profile: Dict[str, Any]) -> Dict[str, str]:
                         code = f"result = df.rename(columns={{'{c}':'{new}'}})\nfig = px.bar(pd.DataFrame({{'x':['before','after']}}), x='x', y=[1,1], title='Renamed')"
                         explanation = f"Renamed {c} to {new}"
                         return {"code": code, "explanation": explanation}
-        
+
         # 5. Convert type
-        if "convert" in q or "change type" in q or "to datetime" in q or "to numeric" in q or "to string" in q:
+        if (
+            "convert" in q
+            or "change type" in q
+            or "to datetime" in q
+            or "to numeric" in q
+            or "to string" in q
+        ):
             col = None
             for c in cols:
                 if c.lower() in q:
@@ -407,7 +446,7 @@ def fallback_coder(query: str, profile: Dict[str, Any]) -> Dict[str, str]:
                     code = f"result = df.copy()\nresult['{col}'] = pd.to_numeric(result['{col}'], errors='coerce')\nfig = px.bar(pd.DataFrame({{'metric':['converted']}}), x='metric', y=[1], title='Converted {col}')"
                     explanation = f"Converted {col}"
                 return {"code": code, "explanation": explanation}
-        
+
         # 6. Trim whitespace
         if "trim" in q or ("whitespace" in q and any(c.lower() in q for c in cols)):
             col = None
@@ -421,7 +460,7 @@ def fallback_coder(query: str, profile: Dict[str, Any]) -> Dict[str, str]:
                 code = f"result = df.copy()\nfor col in result.select_dtypes(include=['object']).columns:\n    result[col] = result[col].astype(str).str.strip()\nfig = px.bar(pd.DataFrame({{'metric':['trimmed']}}), x='metric', y=[1], title='Trimmed whitespace')"
             explanation = "Trimmed whitespace"
             return {"code": code, "explanation": explanation}
-        
+
         # 7. Standardize case
         if "standardize" in q or ("case" in q and ("lower" in q or "upper" in q or "title" in q)):
             col = None
@@ -446,7 +485,7 @@ def fallback_coder(query: str, profile: Dict[str, Any]) -> Dict[str, str]:
                     code = f"result = df.copy()\nfor col in result.select_dtypes(include=['object']).columns:\n    result[col] = result[col].astype(str).str.title()\nfig = px.bar(pd.DataFrame({{'x':['title']}}), x='x', y=[1], title='Standardized')"
             explanation = "Standardized case"
             return {"code": code, "explanation": explanation}
-        
+
         # 8. Split column
         if "split" in q:
             col = None
@@ -470,7 +509,7 @@ def fallback_coder(query: str, profile: Dict[str, Any]) -> Dict[str, str]:
                 code = f"result = df.copy()\nresult[['{col}_1','{col}_2']] = result['{col}'].astype(str).str.split('{delim}', n=1, expand=True)\nfig = px.bar(pd.DataFrame({{'x':['split']}}), x='x', y=[1], title='Split {col} by {delim}')"
                 explanation = f"Split {col} by {delim}"
                 return {"code": code, "explanation": explanation}
-        
+
         # 9. Remove outliers
         if "outlier" in q:
             col = None
@@ -484,7 +523,7 @@ def fallback_coder(query: str, profile: Dict[str, Any]) -> Dict[str, str]:
                 code = f"result = df[(df['{col}'] - df['{col}'].mean()).abs() <= 3*df['{col}'].std()]\nfig = px.bar(pd.DataFrame({{'metric':['before','after'], 'value':[len(df), len(result)]}}), x='metric', y='value', title='Removed outliers in {col}')"
                 explanation = f"Removed outliers in {col}"
                 return {"code": code, "explanation": explanation}
-        
+
         # 10. Generic clean fallback
         code = f"result = df.dropna().drop_duplicates()\nfig = px.bar(pd.DataFrame({{'metric':['rows_before','rows_after'], 'value':[len(df), len(result)]}}), x='metric', y='value', title='Cleaned data')"
         explanation = "Cleaned data (drop nulls + duplicates)"
@@ -523,7 +562,7 @@ def fallback_coder(query: str, profile: Dict[str, Any]) -> Dict[str, str]:
         # If query mentions a categorical explicitly before "by" or at start, prefer it
         # e.g., "top 5 products" -> Product
         for c in cat_cols:
-            if c.lower().rstrip('s') in q or c.lower() in q:
+            if c.lower().rstrip("s") in q or c.lower() in q:
                 # Check if this categorical appears before "by"
                 if "by" not in q or q.index(c.lower()) < q.index("by"):
                     cat = c
@@ -554,7 +593,10 @@ def fallback_coder(query: str, profile: Dict[str, Any]) -> Dict[str, str]:
         return {"code": code, "explanation": explanation}
 
     # 2. Monthly / trend / over time
-    if any(k in q for k in ["trend", "over time", "monthly", "yearly", "daily", "time series", "evolution"]):
+    if any(
+        k in q
+        for k in ["trend", "over time", "monthly", "yearly", "daily", "time series", "evolution"]
+    ):
         # Try to find date column
         date_col = None
         for c in cols:
@@ -617,26 +659,33 @@ def fallback_coder(query: str, profile: Dict[str, Any]) -> Dict[str, str]:
     # 7. Average / mean / median / sum / count
     if any(k in q for k in ["average", "mean", "median", "sum", "total", "count", "min", "max"]):
         agg = "mean"
-        if "median" in q: agg = "median"
-        elif "sum" in q or "total" in q: agg = "sum"
-        elif "count" in q: agg = "count"
-        elif "max" in q: agg = "max"
-        elif "min" in q: agg = "min"
-        
+        if "median" in q:
+            agg = "median"
+        elif "sum" in q or "total" in q:
+            agg = "sum"
+        elif "count" in q:
+            agg = "count"
+        elif "max" in q:
+            agg = "max"
+        elif "min" in q:
+            agg = "min"
+
         # Check for groupby
         if "by" in q or "per" in q or "for each" in q:
             cat = find_categorical()
             num = find_numeric()
             for c in numeric_cols:
                 if c.lower() in q:
-                    num = c; break
+                    num = c
+                    break
             code = f"result = df.groupby('{cat}')['{num}'].{agg}().reset_index()\nfig = px.bar(result, x='{cat}', y='{num}', title='{agg.title()} of {num} by {cat}', color='{num}')"
             explanation = f"{agg} of {num} by {cat}"
         else:
             num = find_numeric()
             for c in numeric_cols:
                 if c.lower() in q:
-                    num = c; break
+                    num = c
+                    break
             if agg == "count":
                 code = f"result = pd.DataFrame({{'count': [df['{num}'].count()]}})\nfig = px.bar(x=['{num}'], y=[df['{num}'].count()], title='Count of {num}')"
             else:
@@ -645,7 +694,9 @@ def fallback_coder(query: str, profile: Dict[str, Any]) -> Dict[str, str]:
         return {"code": code, "explanation": explanation}
 
     # 8. Filter / where
-    if any(k in q for k in ["filter", "where", "greater than", "less than", "equal to", "==", ">", "<"]):
+    if any(
+        k in q for k in ["filter", "where", "greater than", "less than", "equal to", "==", ">", "<"]
+    ):
         # Try to extract condition after where/filter
         condition = query
         # Extract after where
@@ -657,7 +708,12 @@ def fallback_coder(query: str, profile: Dict[str, Any]) -> Dict[str, str]:
             if filter_match:
                 condition = filter_match.group(1)
         # Handle textual operators
-        condition = condition.replace("greater than", ">").replace("less than", "<").replace("equal to", "==").replace("equals", "==")
+        condition = (
+            condition.replace("greater than", ">")
+            .replace("less than", "<")
+            .replace("equal to", "==")
+            .replace("equals", "==")
+        )
         # Escape single quotes for query
         condition_escaped = condition.replace("'", "\\'").replace('"', "'")
         # If condition still contains query words, fallback to head
@@ -678,7 +734,9 @@ def fallback_coder(query: str, profile: Dict[str, Any]) -> Dict[str, str]:
         return {"code": code, "explanation": explanation}
 
     # 10. Describe / profile / summary / overview
-    if any(k in q for k in ["describe", "profile", "summary", "overview", "info", "head", "columns"]):
+    if any(
+        k in q for k in ["describe", "profile", "summary", "overview", "info", "head", "columns"]
+    ):
         code = "result = df.describe(include='all').T.reset_index().rename(columns={'index':'column'})\nnulls = df.isna().sum().reset_index()\nnulls.columns = ['column','nulls']\nfig = px.bar(nulls, x='column', y='nulls', title='Missing Values')"
         explanation = "Dataset description and missing values"
         return {"code": code, "explanation": explanation}
@@ -734,7 +792,11 @@ def fallback_coder(query: str, profile: Dict[str, Any]) -> Dict[str, str]:
     # 13. Default fallback: show relevant groupby + insight
     # If no pattern matched, do a smart default: group by most categorical, sum most numeric
     cat = cat_cols[0] if cat_cols else (cols[0] if cols else "category")
-    num = numeric_cols[0] if numeric_cols else (cols[1] if len(cols) > 1 else cols[0] if cols else "value")
+    num = (
+        numeric_cols[0]
+        if numeric_cols
+        else (cols[1] if len(cols) > 1 else cols[0] if cols else "value")
+    )
     # If query is very short or greeting, show head
     if len(q.split()) <= 3 or any(k in q for k in ["hi", "hello", "help", "what can you do"]):
         code = f"result = df.head(10)\nfig = px.bar(df.groupby('{cat}')['{num}'].sum().reset_index().head(10), x='{cat}', y='{num}', title='Overview: {num} by {cat}')"
@@ -743,23 +805,47 @@ def fallback_coder(query: str, profile: Dict[str, Any]) -> Dict[str, str]:
         # Generic: try to answer by showing aggregated view
         code = f"result = df.groupby('{cat}')['{num}'].sum().sort_values(ascending=False).reset_index().head(10)\nfig = px.bar(result, x='{cat}', y='{num}', title='{num} by {cat} (Top 10)', color='{num}')"
         explanation = f"Top 10 {cat} by {num} (default)"
-    
+
     return {"code": code, "explanation": explanation}
 
-async def generate_code(query: str, profile: Dict[str, Any], intent: Dict[str, Any]) -> Dict[str, str]:
+
+async def generate_code(
+    query: str, profile: Dict[str, Any], intent: Dict[str, Any]
+) -> Dict[str, str]:
     """Generate code via LLM if available else fallback. Supports all providers. L4: sql intent -> duckdb."""
     # L4: early sql branch for raw SQL (highest priority, no LLM needed)
     q_lower = query.lower().strip()
     if q_lower.startswith("select") or q_lower.startswith("with"):
         # Validate read-only
         if _is_write_sql(q_lower):
-            return {"code": "result = df.head(10)\nfig = px.bar(result.head(5), x=result.columns[0], y=result.columns[1] if len(result.columns)>1 else result.columns[0], title='Blocked: read-only SQL only')", "explanation": "Blocked DDL/DML"}
+            return {
+                "code": "result = df.head(10)\nfig = px.bar(result.head(5), x=result.columns[0], y=result.columns[1] if len(result.columns)>1 else result.columns[0], title='Blocked: read-only SQL only')",
+                "explanation": "Blocked DDL/DML",
+            }
         # For raw SQL, directly craft duckdb code (fallback_coder already does but we short-circuit to avoid LLM)
         # Use fallback to keep logic consistent
         return fallback_coder(query, profile)
     # Deterministic analytics / why / outlier / forecast / segment / what-if must bypass LLM even when key present (tests + quality)
     _q_analytic = q_lower
-    if any(k in _q_analytic for k in ["outlier", "anomal", "why ", "why?", "explain", "forecast", "predict", "segment by", "cohort by", "breakdown by", "what if", "what-if", "correlation", "heatmap"]) or any(w in _q_analytic for w in ["why did", "why sales"]):
+    if any(
+        k in _q_analytic
+        for k in [
+            "outlier",
+            "anomal",
+            "why ",
+            "why?",
+            "explain",
+            "forecast",
+            "predict",
+            "segment by",
+            "cohort by",
+            "breakdown by",
+            "what if",
+            "what-if",
+            "correlation",
+            "heatmap",
+        ]
+    ) or any(w in _q_analytic for w in ["why did", "why sales"]):
         return fallback_coder(query, profile)
     # L4/L5: handle analytics intent via fallback (analytics branches are inside fallback_coder)
     if intent.get("intent") == "analytics":
@@ -780,12 +866,20 @@ async def generate_code(query: str, profile: Dict[str, Any], intent: Dict[str, A
                 )
                 data = extract_json(content)
                 sql = data.get("sql") or data.get("code") or ""
-                if sql and (sql.strip().lower().startswith("select") or sql.strip().lower().startswith("with")):
+                if sql and (
+                    sql.strip().lower().startswith("select")
+                    or sql.strip().lower().startswith("with")
+                ):
                     if _is_write_sql(sql.lower()):
                         raise ValueError("LLM produced write SQL blocked")
                     # Craft code via duckdb
                     code = f"duckdb.register('df', df)\ntry:\n    result = duckdb.query('''{sql}''').to_df()\nexcept Exception as e:\n    result = df.head(20)\nfig = px.bar(result.head(20), x=result.columns[0] if len(result.columns)>0 else 'x', y=result.columns[1] if len(result.columns)>1 else result.columns[0], title='SQL Result')"
-                    return {"code": code, "explanation": data.get("explanation", f"LLM translated to SQL: {sql[:60]}")}
+                    return {
+                        "code": code,
+                        "explanation": data.get(
+                            "explanation", f"LLM translated to SQL: {sql[:60]}"
+                        ),
+                    }
             except Exception as e:
                 print(f"NL→SQL LLM failed, fallback heuristic: {e}")
         # Fallback without LLM: heuristic NL->SQL is limited; let fallback_coder's groupby still work but add hint via profile
@@ -801,7 +895,7 @@ async def generate_code(query: str, profile: Dict[str, Any], intent: Dict[str, A
     llm = get_llm()
     if not llm:
         return fallback_coder(query, profile)
-    
+
     try:
         profile_text = get_profile_summary_text(profile)
         user_msg = f"User Query: {query}\n\nData Profile:\n{profile_text}\n\nIntent: {intent}\n\nGenerate code:"
@@ -815,7 +909,10 @@ async def generate_code(query: str, profile: Dict[str, Any], intent: Dict[str, A
         data = extract_json(content)
         if "code" not in data:
             return fallback_coder(query, profile)
-        return {"code": data["code"], "explanation": data.get("explanation", f"LLM ({llm.provider}) generated")}
+        return {
+            "code": data["code"],
+            "explanation": data.get("explanation", f"LLM ({llm.provider}) generated"),
+        }
     except Exception as e:
         print(f"Coder LLM ({get_llm().provider if get_llm() else 'none'}) failed, fallback: {e}")
         return fallback_coder(query, profile)

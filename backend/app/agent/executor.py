@@ -10,11 +10,14 @@ import pandas as pd
 from app.core.security import validate_code, get_safe_globals, SecurityError
 from app.config import settings
 
+
 class TimeoutException(Exception):
     pass
 
+
 def _timeout_handler(signum, frame):
     raise TimeoutException("Execution timed out")
+
 
 def execute_with_timeout(code: str, safe_globals: dict, local_vars: dict, timeout: int):
     """Execute code with timeout. Uses signal on Unix, thread fallback."""
@@ -36,6 +39,7 @@ def execute_with_timeout(code: str, safe_globals: dict, local_vars: dict, timeou
 
     # Fallback: thread with timeout
     result = {"exc": None}
+
     def target():
         try:
             exec(code, safe_globals, local_vars)
@@ -53,6 +57,7 @@ def execute_with_timeout(code: str, safe_globals: dict, local_vars: dict, timeou
         # Re-raise with traceback
         raise result["exc"]
 
+
 def dataframe_to_json(df: pd.DataFrame, max_rows: int = 100) -> Dict[str, Any]:
     """Convert DataFrame to JSON serializable dict for frontend."""
     if len(df) > max_rows:
@@ -61,12 +66,13 @@ def dataframe_to_json(df: pd.DataFrame, max_rows: int = 100) -> Dict[str, Any]:
     else:
         df_display = df
         truncated = False
-    
+
     # Convert to records
     # Handle non-serializable types
     records = df_display.fillna("").to_dict(orient="records")
     # Ensure JSON serializable: convert numpy types, timestamps
     import numpy as np
+
     for rec in records:
         for k, v in rec.items():
             if isinstance(v, (np.integer,)):
@@ -94,6 +100,7 @@ def dataframe_to_json(df: pd.DataFrame, max_rows: int = 100) -> Dict[str, Any]:
         "dtypes": {str(k): str(v) for k, v in df.dtypes.items()},
     }
 
+
 def fig_to_json(fig) -> Optional[Dict[str, Any]]:
     """Convert Plotly fig to dict for frontend."""
     if fig is None:
@@ -107,9 +114,11 @@ def fig_to_json(fig) -> Optional[Dict[str, Any]]:
                 pass
         if hasattr(fig, "to_dict"):
             d = fig.to_dict()
+
             # Recursively convert ndarrays to lists
             def _convert(o):
                 import numpy as np
+
                 if isinstance(o, np.ndarray):
                     return o.tolist()
                 if isinstance(o, dict):
@@ -123,11 +132,13 @@ def fig_to_json(fig) -> Optional[Dict[str, Any]]:
                 if isinstance(o, (np.bool_,)):
                     return bool(o)
                 return o
+
             return _convert(d)
         return None
     except Exception as e:
         print(f"Fig conversion failed: {e}")
         return None
+
 
 def execute_code(code: str, df: pd.DataFrame, timeout: int = None) -> Dict[str, Any]:
     """
@@ -163,7 +174,7 @@ def execute_code(code: str, df: pd.DataFrame, timeout: int = None) -> Dict[str, 
     # Prepare execution env
     safe_globals = get_safe_globals(df)
     local_vars = {}
-    
+
     # Capture stdout
     old_stdout = sys.stdout
     stdout_capture = io.StringIO()
@@ -190,7 +201,7 @@ def execute_code(code: str, df: pd.DataFrame, timeout: int = None) -> Dict[str, 
             if result is None:
                 # fallback: show head
                 result = df.head(10)
-        
+
         # Convert result to JSON
         result_json = None
         if isinstance(result, pd.DataFrame):
@@ -204,16 +215,37 @@ def execute_code(code: str, df: pd.DataFrame, timeout: int = None) -> Dict[str, 
                 tmp = pd.DataFrame([result])
                 result_json = dataframe_to_json(tmp)
             except:
-                result_json = {"columns": ["value"], "data": [{"value": str(result)}], "rows": 1, "columns_count": 1, "truncated": False, "display_rows": 1}
+                result_json = {
+                    "columns": ["value"],
+                    "data": [{"value": str(result)}],
+                    "rows": 1,
+                    "columns_count": 1,
+                    "truncated": False,
+                    "display_rows": 1,
+                }
         elif isinstance(result, list):
             try:
                 tmp = pd.DataFrame(result)
                 result_json = dataframe_to_json(tmp)
             except:
-                result_json = {"columns": ["value"], "data": [{"value": str(v)} for v in result[:100]], "rows": len(result), "columns_count": 1, "truncated": len(result) > 100, "display_rows": min(len(result), 100)}
+                result_json = {
+                    "columns": ["value"],
+                    "data": [{"value": str(v)} for v in result[:100]],
+                    "rows": len(result),
+                    "columns_count": 1,
+                    "truncated": len(result) > 100,
+                    "display_rows": min(len(result), 100),
+                }
         else:
             # Single value
-            result_json = {"columns": ["result"], "data": [{"result": str(result)}], "rows": 1, "columns_count": 1, "truncated": False, "display_rows": 1}
+            result_json = {
+                "columns": ["result"],
+                "data": [{"result": str(result)}],
+                "rows": 1,
+                "columns_count": 1,
+                "truncated": False,
+                "display_rows": 1,
+            }
 
         chart_json = fig_to_json(fig)
 

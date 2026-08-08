@@ -5,10 +5,12 @@ import json
 
 router = APIRouter(prefix="/api/jobs", tags=["jobs"])
 
+
 def _jobs_dir():
     d = get_storage_path() / "jobs"
     d.mkdir(parents=True, exist_ok=True)
     return d
+
 
 @router.get("/{job_id}")
 async def get_job(job_id: str):
@@ -23,6 +25,7 @@ async def get_job(job_id: str):
     # Try redis
     try:
         from app.core.cache import get as cache_get
+
         v = cache_get(f"job:{job_id}")
         if v:
             return v

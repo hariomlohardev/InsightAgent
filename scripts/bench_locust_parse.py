@@ -1,9 +1,11 @@
 """BF-01 locust parser — assert p95 from locust --csv export."""
+
 import argparse
 import csv
 from pathlib import Path
 import json
 import sys
+
 
 def parse_locust(csv_path: Path, p95_ms: int = 150, expect_hit_rate: float = None):
     # locust --csv writes <prefix>_stats.csv with header Name, # reqs, # fails, Avg, Min, Max, Median, ...
@@ -42,7 +44,7 @@ def parse_locust(csv_path: Path, p95_ms: int = 150, expect_hit_rate: float = Non
                 pass
     if p95 is None:
         # try any key containing 95
-        for k,v in agg.items():
+        for k, v in agg.items():
             if "95" in k:
                 try:
                     p95 = float(v)
@@ -54,7 +56,13 @@ def parse_locust(csv_path: Path, p95_ms: int = 150, expect_hit_rate: float = Non
         sys.exit(2)
     # Also get hit cache if present via extra log? ignore
     ok = p95 <= p95_ms
-    result = {"csv": str(csv_path), "p95_ms": p95, "gate_p95_ms": p95_ms, "pass": ok, "aggregated": agg}
+    result = {
+        "csv": str(csv_path),
+        "p95_ms": p95,
+        "gate_p95_ms": p95_ms,
+        "pass": ok,
+        "aggregated": agg,
+    }
     print(json.dumps(result, indent=2))
     if not ok:
         print(f"FAIL p95 {p95:.0f}ms > gate {p95_ms}ms", file=sys.stderr)
@@ -62,6 +70,7 @@ def parse_locust(csv_path: Path, p95_ms: int = 150, expect_hit_rate: float = Non
     else:
         print(f"PASS p95 {p95:.0f}ms <= {p95_ms}ms")
         sys.exit(0)
+
 
 if __name__ == "__main__":
     ap = argparse.ArgumentParser()

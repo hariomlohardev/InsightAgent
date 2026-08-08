@@ -9,6 +9,7 @@ CACHE_TTL = int(os.getenv("CACHE_TTL", "60"))
 
 _redis_client = None
 
+
 def _get_redis():
     global _redis_client
     if _redis_client is not None:
@@ -17,6 +18,7 @@ def _get_redis():
         return None
     try:
         import redis
+
         _redis_client = redis.from_url(REDIS_URL, decode_responses=True)
         # ping
         _redis_client.ping()
@@ -25,9 +27,11 @@ def _get_redis():
         _redis_client = None
         return None
 
+
 # In-memory LRU fallback
 _memory_cache = {}
 _memory_times = {}
+
 
 def get(key: str) -> Optional[Any]:
     r = _get_redis()
@@ -44,13 +48,14 @@ def get(key: str) -> Optional[Any]:
             pass
     # memory fallback
     if key in _memory_cache:
-        ts, ttl, val = _memory_times.get(key, (0,0,None))
+        ts, ttl, val = _memory_times.get(key, (0, 0, None))
         if time.time() - ts < ttl:
             return val
         else:
             _memory_cache.pop(key, None)
             _memory_times.pop(key, None)
     return None
+
 
 def set(key: str, value: Any, ttl: int = None):
     if ttl is None:
@@ -76,11 +81,12 @@ def set(key: str, value: Any, ttl: int = None):
         _memory_cache.pop(oldest[0], None)
         _memory_times.pop(oldest[0], None)
 
+
 def clear_prefix(prefix: str):
     r = _get_redis()
     if r:
         try:
-            for k in r.scan_iter(match=prefix+"*"):
+            for k in r.scan_iter(match=prefix + "*"):
                 r.delete(k)
         except:
             pass
@@ -89,6 +95,7 @@ def clear_prefix(prefix: str):
         if k.startswith(prefix):
             _memory_cache.pop(k, None)
             _memory_times.pop(k, None)
+
 
 def cache_key(*parts) -> str:
     # hash long parts

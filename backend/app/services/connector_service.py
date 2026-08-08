@@ -12,13 +12,16 @@ from app.core.storage import _atomic_write_json
 from app.core.profiling import profile_dataframe
 from app.core.connectors import fetch_df, validate_sql, fetch_sqlite_df
 
+
 def _connectors_dir() -> Path:
     d = get_storage_path() / "connectors"
     d.mkdir(parents=True, exist_ok=True)
     return d
 
+
 def _connector_path(cid: str) -> Path:
     return _connectors_dir() / f"{cid}.json"
+
 
 def list_connectors() -> List[Dict[str, Any]]:
     out = []
@@ -32,6 +35,7 @@ def list_connectors() -> List[Dict[str, Any]]:
     out.sort(key=lambda x: x.get("created_at", ""), reverse=True)
     return out
 
+
 def get_connector(cid: str) -> Optional[Dict[str, Any]]:
     p = _connector_path(cid)
     if not p.exists():
@@ -41,6 +45,7 @@ def get_connector(cid: str) -> Optional[Dict[str, Any]]:
             return json.load(f)
     except:
         return None
+
 
 def delete_connector(cid: str) -> bool:
     # Delete connector json + dataset meta symlink/dir
@@ -53,6 +58,7 @@ def delete_connector(cid: str) -> bool:
     d = get_storage_path() / "datasets" / cid
     if d.exists():
         import shutil
+
         try:
             shutil.rmtree(d)
             ok = True
@@ -67,21 +73,42 @@ def delete_connector(cid: str) -> bool:
         pass
     return ok
 
-def _sanitize_connector_input(kind: str, dsn: str = None, table: str = None, sheet_url: str = None) -> None:
+
+def _sanitize_connector_input(
+    kind: str, dsn: str = None, table: str = None, sheet_url: str = None
+) -> None:
     kind = (kind or "").lower()
-    allowed = {"postgres","postgresql","mysql","sqlite","bigquery","bq","sheets","gsheets","google_sheets"}
+    allowed = {
+        "postgres",
+        "postgresql",
+        "mysql",
+        "sqlite",
+        "bigquery",
+        "bq",
+        "sheets",
+        "gsheets",
+        "google_sheets",
+    }
     if kind not in allowed:
         raise ValueError(f"Unsupported kind '{kind}'. Allowed: {sorted(allowed)}")
 
-def create_connector(kind: str, name: str = None, dsn: str = None, table: str = None, sheet_url: str = None, credentials_json: str = None) -> Dict[str, Any]:
+
+def create_connector(
+    kind: str,
+    name: str = None,
+    dsn: str = None,
+    table: str = None,
+    sheet_url: str = None,
+    credentials_json: str = None,
+) -> Dict[str, Any]:
     kind = (kind or "").lower().strip()
     if kind == "postgresql":
         kind = "postgres"
-    if kind in ("gsheets","google_sheets"):
+    if kind in ("gsheets", "google_sheets"):
         kind = "sheets"
     if kind == "bq":
         kind = "bigquery"
-    allowed = {"postgres","mysql","sqlite","bigquery","sheets"}
+    allowed = {"postgres", "mysql", "sqlite", "bigquery", "sheets"}
     if kind not in allowed:
         raise ValueError(f"Unsupported kind '{kind}'")
     if not name:
@@ -89,7 +116,7 @@ def create_connector(kind: str, name: str = None, dsn: str = None, table: str = 
     if len(name) > 100:
         raise ValueError("Name too long (max 100)")
     # Kind-specific validation
-    if kind in ("postgres","mysql"):
+    if kind in ("postgres", "mysql"):
         if not dsn:
             raise ValueError(f"{kind} requires dsn (e.g., postgresql://user:pass@host/db)")
     elif kind == "sqlite":
@@ -137,7 +164,12 @@ def create_connector(kind: str, name: str = None, dsn: str = None, table: str = 
             rows_est = len(df_sample)
         connector["sample_error"] = None
     except Exception as e:
-        profile = {"error": str(e), "column_names": [], "numeric_columns": [], "categorical_columns": []}
+        profile = {
+            "error": str(e),
+            "column_names": [],
+            "numeric_columns": [],
+            "categorical_columns": [],
+        }
         rows_est = 0
         sample_error = str(e)
         connector["sample_error"] = sample_error[:500]
@@ -157,7 +189,7 @@ def create_connector(kind: str, name: str = None, dsn: str = None, table: str = 
         "id": cid,
         "original_filename": name or f"{kind}_{cid}",
         "created_at": connector["created_at"],
-        "rows": int(rows_est) if 'rows_est' in locals() else 0,
+        "rows": int(rows_est) if "rows_est" in locals() else 0,
         "columns": int(len(cols)),
         "column_names": [str(c) for c in cols],
         "file_path": str(ds_dir / "data.csv"),  # virtual, may not exist
@@ -171,15 +203,26 @@ def create_connector(kind: str, name: str = None, dsn: str = None, table: str = 
     # Also write versions for compatibility
     versions_dir = ds_dir / "versions"
     versions_dir.mkdir(exist_ok=True)
-    _atomic_write_json(versions_dir / "versions.json", [{"version":0,"op":"create","prompt":"connector","created_at":connector["created_at"]}])
+    _atomic_write_json(
+        versions_dir / "versions.json",
+        [
+            {
+                "version": 0,
+                "op": "create",
+                "prompt": "connector",
+                "created_at": connector["created_at"],
+            }
+        ],
+    )
     # Try to cache sample as data.csv for fallback? We can write sample 5 rows as data.csv so load_dataset_df has something if fetch fails later
     try:
-        if 'df_sample' in locals() and df_sample is not None and not df_sample.empty:
+        if "df_sample" in locals() and df_sample is not None and not df_sample.empty:
             df_sample.to_csv(ds_dir / "data.csv", index=False)
     except:
         pass
 
     return meta  # Return dataset-like meta so API can reuse DatasetResponse + connector info
+
 
 def query_connector(cid: str, sql: str, limit: int = 500) -> Dict[str, Any]:
     connector = get_connector(cid)
@@ -189,10 +232,19 @@ def query_connector(cid: str, sql: str, limit: int = 500) -> Dict[str, Any]:
     df = fetch_df(connector, limit=limit, sql=sql)
     # Profile but reuse
     from app.core.profiling import profile_dataframe
+
     profile = profile_dataframe(df)
     from app.agent.executor import dataframe_to_json
+
     preview = dataframe_to_json(df.head(20), max_rows=20)
-    return {"result": dataframe_to_json(df, max_rows=500), "profile": profile, "preview": preview, "rows": len(df), "columns": len(df.columns)}
+    return {
+        "result": dataframe_to_json(df, max_rows=500),
+        "profile": profile,
+        "preview": preview,
+        "rows": len(df),
+        "columns": len(df.columns),
+    }
+
 
 def fetch_connector_df(cid: str, limit: int = 500, sql: str = None) -> pd.DataFrame:
     connector = get_connector(cid)
@@ -202,13 +254,14 @@ def fetch_connector_df(cid: str, limit: int = 500, sql: str = None) -> pd.DataFr
         validate_sql(sql)
     return fetch_df(connector, limit=limit, sql=sql)
 
+
 def join_datasets(ids: List[str], on: str, how: str = "left") -> Dict[str, Any]:
     if len(ids) < 2 or len(ids) > 3:
         raise ValueError("Join requires 2-3 dataset ids")
     if not on or not on.strip():
         raise ValueError("Join key 'on' cannot be empty")
     how = (how or "left").lower()
-    if how not in ("inner","left","right","outer"):
+    if how not in ("inner", "left", "right", "outer"):
         raise ValueError("how must be inner|left|right|outer")
     # Load each df
     dfs = []
@@ -233,6 +286,7 @@ def join_datasets(ids: List[str], on: str, how: str = "left") -> Dict[str, Any]:
     result_df: Optional[pd.DataFrame] = None
     try:
         import duckdb
+
         con = duckdb.connect()
         # Register each df
         for idx, df in enumerate(dfs):
@@ -249,12 +303,12 @@ def join_datasets(ids: List[str], on: str, how: str = "left") -> Dict[str, Any]:
         try:
             result_df = dfs[0]
             for other in dfs[1:]:
-                result_df = result_df.merge(other, on=on, how=how, suffixes=('', '_r'))
+                result_df = result_df.merge(other, on=on, how=how, suffixes=("", "_r"))
             # If duplicate columns with suffix, keep first
         except Exception as e2:
             raise RuntimeError(f"Join failed (duckdb: {e}; pandas: {e2})")
 
-    if result_df is None or result_df.empty and len(dfs[0])>0:
+    if result_df is None or result_df.empty and len(dfs[0]) > 0:
         # Could be empty due to inner join; still allow
         pass
     if result_df is None:
@@ -264,6 +318,7 @@ def join_datasets(ids: List[str], on: str, how: str = "left") -> Dict[str, Any]:
     # Create dataset via storage.save_dataset from temp csv
     import tempfile
     from pathlib import Path
+
     with tempfile.NamedTemporaryFile(delete=False, suffix=".csv") as tmp:
         result_df.to_csv(tmp.name, index=False)
         tmp_path = Path(tmp.name)

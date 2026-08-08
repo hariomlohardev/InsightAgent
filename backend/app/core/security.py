@@ -1,30 +1,121 @@
 import ast
 
 # Modules that generated code is allowed to import/use (for reference, not enforced as strict allowlist)
-ALLOWED_MODULES = {"pandas", "pd", "numpy", "np", "plotly", "plotly.express", "plotly.graph_objects", "px", "go", "duckdb", "datetime", "json", "re", "math", "statsforecast", "prophet"}
+ALLOWED_MODULES = {
+    "pandas",
+    "pd",
+    "numpy",
+    "np",
+    "plotly",
+    "plotly.express",
+    "plotly.graph_objects",
+    "px",
+    "go",
+    "duckdb",
+    "datetime",
+    "json",
+    "re",
+    "math",
+    "statsforecast",
+    "prophet",
+}
 
 # Explicitly blocked imports - any attempt is rejected. Extended for L1.4 hardening.
 BLOCKED_MODULES = {
-    "os", "sys", "subprocess", "socket", "shutil", "pathlib", "importlib", "builtins", "__builtins__",
-    "eval", "exec", "time", "threading", "multiprocessing", "concurrent", "asyncio", "pty", "tty",
-    "ctypes", "cffi", "signal", "gc", "inspect", "ast", "dis", "code", "codeop", "compileall", "py_compile",
-    "pickle", "marshal", "shelve", "dbm", "sqlite3", "http", "urllib", "ftplib", "smtplib", "poplib", "imaplib",
+    "os",
+    "sys",
+    "subprocess",
+    "socket",
+    "shutil",
+    "pathlib",
+    "importlib",
+    "builtins",
+    "__builtins__",
+    "eval",
+    "exec",
+    "time",
+    "threading",
+    "multiprocessing",
+    "concurrent",
+    "asyncio",
+    "pty",
+    "tty",
+    "ctypes",
+    "cffi",
+    "signal",
+    "gc",
+    "inspect",
+    "ast",
+    "dis",
+    "code",
+    "codeop",
+    "compileall",
+    "py_compile",
+    "pickle",
+    "marshal",
+    "shelve",
+    "dbm",
+    "sqlite3",
+    "http",
+    "urllib",
+    "ftplib",
+    "smtplib",
+    "poplib",
+    "imaplib",
 }
 
 BLOCKED_NAMES = {
-    "eval", "exec", "compile", "__import__", "open", "input", "exit", "quit", "help",
-    "globals", "locals", "vars", "dir", "getattr", "setattr", "delattr", "hasattr",
-    "breakpoint", "memoryview", "bytearray", "bytes", "execfile", "file", "raw_input",
+    "eval",
+    "exec",
+    "compile",
+    "__import__",
+    "open",
+    "input",
+    "exit",
+    "quit",
+    "help",
+    "globals",
+    "locals",
+    "vars",
+    "dir",
+    "getattr",
+    "setattr",
+    "delattr",
+    "hasattr",
+    "breakpoint",
+    "memoryview",
+    "bytearray",
+    "bytes",
+    "execfile",
+    "file",
+    "raw_input",
 }
 
 BLOCKED_ATTRS = {
-    "__class__", "__bases__", "__subclasses__", "__dict__", "__weakref__", "__mro__",
-    "__globals__", "__code__", "__closure__", "__self__", "__module__", "__annotations__",
-    "__wrapped__", "__qualname__", "gi_frame", "gi_code", "cr_frame", "cr_code",
+    "__class__",
+    "__bases__",
+    "__subclasses__",
+    "__dict__",
+    "__weakref__",
+    "__mro__",
+    "__globals__",
+    "__code__",
+    "__closure__",
+    "__self__",
+    "__module__",
+    "__annotations__",
+    "__wrapped__",
+    "__qualname__",
+    "gi_frame",
+    "gi_code",
+    "cr_frame",
+    "cr_code",
 }
+
 
 class SecurityError(Exception):
     pass
+
 
 def validate_code(code: str) -> None:
     """
@@ -55,7 +146,9 @@ def validate_code(code: str) -> None:
                 # Block 'from os import path' etc
                 for alias in node.names:
                     if alias.name in BLOCKED_NAMES or alias.name in BLOCKED_ATTRS:
-                        raise SecurityError(f"Import of '{alias.name}' from '{node.module}' is not allowed")
+                        raise SecurityError(
+                            f"Import of '{alias.name}' from '{node.module}' is not allowed"
+                        )
 
         # Block dangerous function calls
         if isinstance(node, ast.Call):
@@ -72,7 +165,9 @@ def validate_code(code: str) -> None:
                 # Block things like subprocess.call, os.system, sys.exit
                 if isinstance(node.func.value, ast.Name):
                     if node.func.value.id in BLOCKED_MODULES:
-                        raise SecurityError(f"Call on blocked module '{node.func.value.id}' is not allowed")
+                        raise SecurityError(
+                            f"Call on blocked module '{node.func.value.id}' is not allowed"
+                        )
                 # Also block nested like os.path.join
                 if isinstance(node.func.value, ast.Attribute):
                     # e.g., os.path.join
@@ -96,17 +191,19 @@ def validate_code(code: str) -> None:
                 raise SecurityError(f"Use of '__import__' is not allowed")
             # Don't block variable named 'os' used as column name; only block if used as value in Call/Attribute already handled
 
+
 def get_safe_globals(df):
     """Build safe globals dict for exec. Limited but includes __import__ for duckdb internal use (user code still blocked via AST)."""
     import pandas as pd
     import numpy as np
     import plotly.express as px
     import plotly.graph_objects as go
+
     try:
         import duckdb
     except ImportError:
         duckdb = None
-    
+
     # Safe builtins - include __import__ for libraries (AST blocks user from using it with dangerous modules)
     safe_builtins_dict = {
         "len": len,
@@ -134,7 +231,7 @@ def get_safe_globals(df):
         "getattr": getattr,
         "__import__": __import__,
     }
-    
+
     safe_globals = {
         "df": df,
         "pd": pd,
@@ -150,6 +247,7 @@ def get_safe_globals(df):
         from app.core.analytics.outliers import find_outliers
         from app.core.analytics.segments import segment
         from app.core.analytics.forecast import forecast
+
         safe_globals["analyze_why"] = analyze_why
         safe_globals["what_if"] = what_if
         safe_globals["find_outliers"] = find_outliers
@@ -161,5 +259,5 @@ def get_safe_globals(df):
     safe_globals.update(safe_builtins_dict)
     # Provide __builtins__ as limited dict
     safe_globals["__builtins__"] = safe_builtins_dict
-    
+
     return safe_globals

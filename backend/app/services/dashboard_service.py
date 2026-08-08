@@ -9,13 +9,16 @@ from app.core import storage
 from app.core.storage import _atomic_write_json
 from app.config import get_storage_path
 
+
 def _dashboards_dir() -> Path:
     d = get_storage_path() / "dashboards"
     d.mkdir(parents=True, exist_ok=True)
     return d
 
+
 def _dashboard_path(dash_id: str) -> Path:
     return _dashboards_dir() / f"{dash_id}.json"
+
 
 def generate_slug() -> str:
     # 8-char urlsafe, collision check
@@ -35,6 +38,7 @@ def generate_slug() -> str:
         if slug not in slugs:
             return slug
     return secrets.token_urlsafe(8)[:8]
+
 
 def create_dashboard(dataset_id: str, name: str, description: str = "") -> Dict[str, Any]:
     # Validate dataset exists
@@ -56,6 +60,7 @@ def create_dashboard(dataset_id: str, name: str, description: str = "") -> Dict[
     _atomic_write_json(_dashboard_path(dash_id), dash)
     return dash
 
+
 def get_dashboard(dash_id: str) -> Optional[Dict[str, Any]]:
     p = _dashboard_path(dash_id)
     if not p.exists():
@@ -65,6 +70,7 @@ def get_dashboard(dash_id: str) -> Optional[Dict[str, Any]]:
             return json.load(f)
     except json.JSONDecodeError:
         return None
+
 
 def list_dashboards(dataset_id: Optional[str] = None) -> List[Dict[str, Any]]:
     dashboards = []
@@ -79,12 +85,14 @@ def list_dashboards(dataset_id: Optional[str] = None) -> List[Dict[str, Any]]:
     dashboards.sort(key=lambda x: x.get("updated_at", x.get("created_at", "")), reverse=True)
     return dashboards
 
+
 def delete_dashboard(dash_id: str) -> bool:
     p = _dashboard_path(dash_id)
     if p.exists():
         p.unlink()
         return True
     return False
+
 
 def add_widget(dash_id: str, widget_data: Dict[str, Any]) -> Dict[str, Any]:
     dash = get_dashboard(dash_id)
@@ -110,6 +118,7 @@ def add_widget(dash_id: str, widget_data: Dict[str, Any]) -> Dict[str, Any]:
     _atomic_write_json(_dashboard_path(dash_id), dash)
     return widget
 
+
 def remove_widget(dash_id: str, widget_id: str) -> bool:
     dash = get_dashboard(dash_id)
     if not dash:
@@ -121,6 +130,7 @@ def remove_widget(dash_id: str, widget_id: str) -> bool:
     dash["updated_at"] = datetime.utcnow().isoformat()
     _atomic_write_json(_dashboard_path(dash_id), dash)
     return True
+
 
 def refresh_widget(dash_id: str, widget_id: str) -> Optional[Dict[str, Any]]:
     dash = get_dashboard(dash_id)
@@ -136,6 +146,7 @@ def refresh_widget(dash_id: str, widget_id: str) -> Optional[Dict[str, Any]]:
     from app.core.security import validate_code
     from app.agent.executor import execute_code
     from app.core.storage import load_dataset_df
+
     validate_code(code)
     df = load_dataset_df(dash["dataset_id"])
     exec_res = execute_code(code, df)
@@ -152,18 +163,24 @@ def refresh_widget(dash_id: str, widget_id: str) -> Optional[Dict[str, Any]]:
     _atomic_write_json(_dashboard_path(dash_id), dash)
     return widget
 
+
 def share_dashboard(dash_id: str) -> Dict[str, Any]:
     dash = get_dashboard(dash_id)
     if not dash:
         raise FileNotFoundError(f"Dashboard {dash_id} not found")
     if dash.get("is_public") and dash.get("share_slug"):
-        return {"slug": dash["share_slug"], "is_public": True, "url": f"/api/dashboards/share/{dash['share_slug']}"}
+        return {
+            "slug": dash["share_slug"],
+            "is_public": True,
+            "url": f"/api/dashboards/share/{dash['share_slug']}",
+        }
     slug = generate_slug()
     dash["is_public"] = True
     dash["share_slug"] = slug
     dash["updated_at"] = datetime.utcnow().isoformat()
     _atomic_write_json(_dashboard_path(dash_id), dash)
     return {"slug": slug, "is_public": True, "url": f"/api/dashboards/share/{slug}"}
+
 
 def unshare_dashboard(dash_id: str) -> Dict[str, Any]:
     dash = get_dashboard(dash_id)
@@ -175,6 +192,7 @@ def unshare_dashboard(dash_id: str) -> Dict[str, Any]:
     _atomic_write_json(_dashboard_path(dash_id), dash)
     return {"is_public": False, "slug": dash.get("share_slug")}
 
+
 def get_by_slug(slug: str) -> Optional[Dict[str, Any]]:
     for f in _dashboards_dir().glob("*.json"):
         try:
@@ -185,6 +203,7 @@ def get_by_slug(slug: str) -> Optional[Dict[str, Any]]:
         except:
             continue
     return None
+
 
 def export_dashboard_csv(dash_id: str) -> Dict[str, Any]:
     dash = get_dashboard(dash_id)

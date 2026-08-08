@@ -5,7 +5,14 @@ import numpy as np
 import re
 from typing import Dict, Any
 
-def profile_dataframe(df: pd.DataFrame, sample_n: int = 5, use_cache: bool = True, dataset_id: str = None, version: int = None) -> Dict[str, Any]:
+
+def profile_dataframe(
+    df: pd.DataFrame,
+    sample_n: int = 5,
+    use_cache: bool = True,
+    dataset_id: str = None,
+    version: int = None,
+) -> Dict[str, Any]:
     """Generate profiling info for LLM context and UI. Robust for empty, wide, dirty files. Cached 60s if use_cache."""
     _dbg = os.getenv("DEBUG_PROFILE", "0") in ("1", "true", "yes")
     _t0 = time.time() if _dbg else 0
@@ -14,11 +21,17 @@ def profile_dataframe(df: pd.DataFrame, sample_n: int = 5, use_cache: bool = Tru
     if use_cache:
         try:
             from app.core.cache import get as cache_get, set as cache_set, cache_key
+
             if dataset_id is not None:
                 # Primary key for 10.2: profile:{dataset_id}:{version}
                 ck = cache_key(f"profile:{dataset_id}:{version if version is not None else 0}")
             else:
-                ck = cache_key("profile", str(df.shape), ",".join(map(str, df.columns[:5])), str(id(df) % 100000))
+                ck = cache_key(
+                    "profile",
+                    str(df.shape),
+                    ",".join(map(str, df.columns[:5])),
+                    str(id(df) % 100000),
+                )
             cached = cache_get(ck)
             if cached:
                 return cached
@@ -38,27 +51,33 @@ def profile_dataframe(df: pd.DataFrame, sample_n: int = 5, use_cache: bool = Tru
             "column_names": [],
             "inferred_roles": {},
         }
-    
+
     rows, cols = df.shape
-    
+
     # Handle empty rows but with columns
     if rows == 0:
         columns = []
         for col in df.columns:
-            columns.append({
-                "name": str(col),
-                "dtype": str(df[col].dtype),
-                "nulls": 0,
-                "non_nulls": 0,
-                "unique": 0,
-                "sample_values": [],
-                "inferred_type": "empty",
-            })
+            columns.append(
+                {
+                    "name": str(col),
+                    "dtype": str(df[col].dtype),
+                    "nulls": 0,
+                    "non_nulls": 0,
+                    "unique": 0,
+                    "sample_values": [],
+                    "inferred_type": "empty",
+                }
+            )
         return {
             "shape": {"rows": 0, "columns": int(cols)},
             "columns": columns,
-            "numeric_columns": [str(c) for c in df.select_dtypes(include=[np.number]).columns.tolist()],
-            "categorical_columns": [str(c) for c in df.select_dtypes(include=["object", "category"]).columns.tolist()],
+            "numeric_columns": [
+                str(c) for c in df.select_dtypes(include=[np.number]).columns.tolist()
+            ],
+            "categorical_columns": [
+                str(c) for c in df.select_dtypes(include=["object", "category"]).columns.tolist()
+            ],
             "describe": {},
             "duplicates": 0,
             "sample_rows": [],
@@ -69,9 +88,11 @@ def profile_dataframe(df: pd.DataFrame, sample_n: int = 5, use_cache: bool = Tru
 
     columns = []
     inferred_roles = {}
-    
+
     # Regex for date-like strings (YYYY-MM-DD, MM/DD/YYYY, etc)
-    date_pattern = re.compile(r"^\d{4}[-/]\d{1,2}[-/]\d{1,2}$|^\d{1,2}[-/]\d{1,2}[-/]\d{4}$|^\d{4}[-/]\d{1,2}[-/]\d{1,2} \d{1,2}:\d{2}")
+    date_pattern = re.compile(
+        r"^\d{4}[-/]\d{1,2}[-/]\d{1,2}$|^\d{1,2}[-/]\d{1,2}[-/]\d{4}$|^\d{4}[-/]\d{1,2}[-/]\d{1,2} \d{1,2}:\d{2}"
+    )
 
     # BF-02 vectorized hot path: compute nulls/nunique once (was per-col loop 38% of 1.8s)
     try:
@@ -80,7 +101,7 @@ def profile_dataframe(df: pd.DataFrame, sample_n: int = 5, use_cache: bool = Tru
     except Exception:
         _null_counts = None
         _nunique_counts = None
-    
+
     for col in df.columns:
         dtype = str(df[col].dtype)
         # vectorized lookup, fallback to per-col if vectorized failed
@@ -140,7 +161,7 @@ def profile_dataframe(df: pd.DataFrame, sample_n: int = 5, use_cache: bool = Tru
                     col_info["top_values"] = {}
             else:
                 col_info["top_values"] = {}
-            
+
             # Datetime detection - only on object cols with date-like sample
             if dtype == "object":
                 try:
@@ -161,7 +182,9 @@ def profile_dataframe(df: pd.DataFrame, sample_n: int = 5, use_cache: bool = Tru
                 inferred_roles[str(col)] = "dimension"
         else:
             # datetime etc
-            inferred_roles[str(col)] = "dimension" if "object" in dtype or "category" in dtype else "measure"
+            inferred_roles[str(col)] = (
+                "dimension" if "object" in dtype or "category" in dtype else "measure"
+            )
 
         columns.append(col_info)
 
@@ -174,7 +197,7 @@ def profile_dataframe(df: pd.DataFrame, sample_n: int = 5, use_cache: bool = Tru
         categorical_cols = df.select_dtypes(include=["object", "category"]).columns.tolist()
     except Exception:
         categorical_cols = []
-    
+
     # Try numeric describe, limit to 20 cols to avoid blowup on wide files
     try:
         # Limit df for describe if wide
@@ -213,6 +236,7 @@ def profile_dataframe(df: pd.DataFrame, sample_n: int = 5, use_cache: bool = Tru
                 else:
                     try:
                         import json
+
                         json.dumps(v)
                     except:
                         row[k] = str(v)
@@ -247,25 +271,35 @@ def profile_dataframe(df: pd.DataFrame, sample_n: int = 5, use_cache: bool = Tru
         try:
             total_ms = (time.time() - _t0) * 1000
             import sys
-            print(f"DEBUG_PROFILE profile_dataframe rows={rows} cols={cols} total_ms={total_ms:.1f}", file=sys.stderr)
+
+            print(
+                f"DEBUG_PROFILE profile_dataframe rows={rows} cols={cols} total_ms={total_ms:.1f}",
+                file=sys.stderr,
+            )
         except:
             pass
     if use_cache:
         try:
             from app.core.cache import set as cache_set, cache_key
+
             if dataset_id is not None:
                 ck = cache_key(f"profile:{dataset_id}:{version if version is not None else 0}")
             else:
-                ck = cache_key("profile", str(result["shape"]), ",".join(map(str, result["column_names"][:5])))
+                ck = cache_key(
+                    "profile", str(result["shape"]), ",".join(map(str, result["column_names"][:5]))
+                )
             cache_set(ck, result, ttl=60)
         except:
             pass
     return result
 
+
 def get_profile_summary_text(profile: Dict[str, Any]) -> str:
     """Create compact text for LLM prompt."""
     lines = []
-    lines.append(f"Dataset shape: {profile['shape']['rows']} rows x {profile['shape']['columns']} columns")
+    lines.append(
+        f"Dataset shape: {profile['shape']['rows']} rows x {profile['shape']['columns']} columns"
+    )
     lines.append(f"Columns: {', '.join(profile['column_names'])}")
     if profile.get("inferred_roles"):
         lines.append(f"Roles: {profile['inferred_roles']}")

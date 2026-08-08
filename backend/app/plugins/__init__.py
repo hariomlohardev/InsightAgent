@@ -1,10 +1,13 @@
 """Plugin API — BaseConnector + BaseAnalyzer, entry_points via importlib.metadata."""
+
 import importlib.metadata
 import pandas as pd
 from typing import Dict, Any, List, Optional
 
+
 class BaseConnector:
     """Implement for a new data source. Register via entry_points."""
+
     kind: str = "base"
     display_name: str = "Base"
     # params_schema describes frontend form fields: [{"name":"host","label":"Host","type":"text"}, ...]
@@ -18,19 +21,25 @@ class BaseConnector:
         """Return error string if params invalid, else None."""
         return None
 
+
 class BaseAnalyzer:
     """Implement for custom insight."""
+
     name: str = "base"
+
     def analyze(self, df: pd.DataFrame, query: str) -> Dict[str, Any]:
         raise NotImplementedError
 
+
 _REGISTRY: Dict[str, BaseConnector] = {}
+
 
 def register_connector(cls):
     """Decorator: @register_connector class MyConn(BaseConnector): kind='my'"""
     inst = cls()
     _REGISTRY[inst.kind] = inst
     return cls
+
 
 def get_connector(kind: str) -> Optional[BaseConnector]:
     # Check manual registry first
@@ -55,12 +64,15 @@ def get_connector(kind: str) -> Optional[BaseConnector]:
         pass
     return None
 
+
 def list_connectors() -> List[Dict[str, Any]]:
     """List all connectors: manual + entry_points."""
     out = []
     seen = set()
     for kind, inst in _REGISTRY.items():
-        out.append({"kind": kind, "display_name": inst.display_name, "params_schema": inst.params_schema})
+        out.append(
+            {"kind": kind, "display_name": inst.display_name, "params_schema": inst.params_schema}
+        )
         seen.add(kind)
     # entry_points
     try:
@@ -74,13 +86,20 @@ def list_connectors() -> List[Dict[str, Any]]:
                 try:
                     cls = ep.load()
                     inst = cls()
-                    out.append({"kind": ep.name, "display_name": getattr(inst, "display_name", ep.name), "params_schema": getattr(inst, "params_schema", [])})
+                    out.append(
+                        {
+                            "kind": ep.name,
+                            "display_name": getattr(inst, "display_name", ep.name),
+                            "params_schema": getattr(inst, "params_schema", []),
+                        }
+                    )
                     seen.add(ep.name)
                 except Exception:
                     continue
     except Exception:
         pass
     return out
+
 
 def get_analyzer(name: str) -> Optional[BaseAnalyzer]:
     try:

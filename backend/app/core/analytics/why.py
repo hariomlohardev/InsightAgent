@@ -3,6 +3,7 @@ from typing import Dict, Any, Optional, List, Tuple
 import pandas as pd
 import numpy as np
 
+
 # Helpers to find date column
 def _find_date_col(df: pd.DataFrame) -> Optional[str]:
     candidates = []
@@ -24,6 +25,7 @@ def _find_date_col(df: pd.DataFrame) -> Optional[str]:
             continue
     return None
 
+
 def _find_metric_col(df: pd.DataFrame, query: str, profile: Dict[str, Any]) -> str:
     numeric = profile.get("numeric_columns", [])
     cols = profile.get("column_names", [])
@@ -39,14 +41,38 @@ def _find_metric_col(df: pd.DataFrame, query: str, profile: Dict[str, Any]) -> s
         return numeric[0]
     if cols:
         return cols[0]
-    return df.columns[0] if len(df.columns)>0 else "value"
+    return df.columns[0] if len(df.columns) > 0 else "value"
 
-def _find_period(query: str, df: pd.DataFrame, date_col: Optional[str]) -> Tuple[Optional[str], Optional[str]]:
+
+def _find_period(
+    query: str, df: pd.DataFrame, date_col: Optional[str]
+) -> Tuple[Optional[str], Optional[str]]:
     # Extract month mentions like March, Jan, 2024-03
     month_map = {
-        "january":1, "jan":1, "february":2, "feb":2, "march":3, "mar":3, "april":4, "apr":4,
-        "may":5, "june":6, "jun":6, "july":7, "jul":7, "august":8, "aug":8,
-        "september":9, "sep":9, "sept":9, "october":10, "oct":10, "november":11, "nov":11, "december":12, "dec":12
+        "january": 1,
+        "jan": 1,
+        "february": 2,
+        "feb": 2,
+        "march": 3,
+        "mar": 3,
+        "april": 4,
+        "apr": 4,
+        "may": 5,
+        "june": 6,
+        "jun": 6,
+        "july": 7,
+        "jul": 7,
+        "august": 8,
+        "aug": 8,
+        "september": 9,
+        "sep": 9,
+        "sept": 9,
+        "october": 10,
+        "oct": 10,
+        "november": 11,
+        "nov": 11,
+        "december": 12,
+        "dec": 12,
     }
     q = query.lower()
     month = None
@@ -77,6 +103,7 @@ def _find_period(query: str, df: pd.DataFrame, date_col: Optional[str]) -> Tuple
         return f"month_{month}", date_col
     return None, date_col
 
+
 def analyze_why(df: pd.DataFrame, profile: Dict[str, Any], query: str) -> pd.DataFrame:
     """
     Rule-based why analyzer.
@@ -95,10 +122,21 @@ def analyze_why(df: pd.DataFrame, profile: Dict[str, Any], query: str) -> pd.Dat
     # Exclude datetime columns from segment candidates
     _inferred = profile.get("inferred_roles", {})
     _date_col_name = (date_col or "").lower()
-    cat_cols = [c for c in cat_cols if _inferred.get(c) != "datetime" and c.lower() != _date_col_name and "date" not in c.lower() and "time" not in c.lower()]
+    cat_cols = [
+        c
+        for c in cat_cols
+        if _inferred.get(c) != "datetime"
+        and c.lower() != _date_col_name
+        and "date" not in c.lower()
+        and "time" not in c.lower()
+    ]
     # If no cat_cols after filtering, fallback to any non-numeric non-datetime
     if not cat_cols:
-        cat_cols = [c for c in df.columns if c != metric and df[c].dtype == object and c != date_col and "date" not in c.lower()]
+        cat_cols = [
+            c
+            for c in df.columns
+            if c != metric and df[c].dtype == object and c != date_col and "date" not in c.lower()
+        ]
     if not cat_cols:
         # fallback to first column not metric
         for c in df.columns:
@@ -177,11 +215,17 @@ def analyze_why(df: pd.DataFrame, profile: Dict[str, Any], query: str) -> pd.Dat
     # Now we have pre/post
     # Aggregate by segment_col
     pre_agg = pre.groupby(segment_col)[metric].sum().reset_index().rename(columns={metric: "pre"})
-    post_agg = post.groupby(segment_col)[metric].sum().reset_index().rename(columns={metric: "post"})
+    post_agg = (
+        post.groupby(segment_col)[metric].sum().reset_index().rename(columns={metric: "post"})
+    )
     merged = pd.merge(pre_agg, post_agg, on=segment_col, how="outer").fillna(0)
     merged["delta"] = merged["post"] - merged["pre"]
     # delta_pct: avoid div by zero
-    merged["delta_pct"] = np.where(merged["pre"] != 0, (merged["delta"] / merged["pre"] * 100).round(1), np.where(merged["post"] != 0, 100.0, 0.0))
+    merged["delta_pct"] = np.where(
+        merged["pre"] != 0,
+        (merged["delta"] / merged["pre"] * 100).round(1),
+        np.where(merged["post"] != 0, 100.0, 0.0),
+    )
     total_delta = merged["delta"].sum()
     # contribution: delta / total_delta weighted; if total_delta 0, use absolute delta share
     if total_delta != 0:
@@ -189,11 +233,13 @@ def analyze_why(df: pd.DataFrame, profile: Dict[str, Any], query: str) -> pd.Dat
     else:
         # use post share
         total_post = merged["post"].sum()
-        merged["contribution"] = (merged["post"] / total_post * 100).round(1) if total_post != 0 else 0
+        merged["contribution"] = (
+            (merged["post"] / total_post * 100).round(1) if total_post != 0 else 0
+        )
     # Absolute impact for ranking: sort by most negative delta if query mentions drop/decrease, else most positive if increase, else largest absolute
     q_low = query.lower()
-    is_drop = any(w in q_low for w in ["drop","decrease","down","fall","decline","low"])
-    is_increase = any(w in q_low for w in ["increase","up","rise","high","growth"])
+    is_drop = any(w in q_low for w in ["drop", "decrease", "down", "fall", "decline", "low"])
+    is_increase = any(w in q_low for w in ["increase", "up", "rise", "high", "growth"])
     if is_drop:
         merged = merged.sort_values("delta", ascending=True)  # most negative first
     elif is_increase:
@@ -204,13 +250,16 @@ def analyze_why(df: pd.DataFrame, profile: Dict[str, Any], query: str) -> pd.Dat
     merged = merged.rename(columns={segment_col: "category"})
     merged["period"] = period_label
     # Keep cols for display
-    cols = ["category","pre","post","delta","delta_pct","contribution","period"]
+    cols = ["category", "pre", "post", "delta", "delta_pct", "contribution", "period"]
     for c in cols:
         if c not in merged.columns:
             merged[c] = 0
     return merged[cols]
 
-def what_if(df: pd.DataFrame, col: str, pct: float, metric: str = None, by: str = None, agg: str = "sum") -> pd.DataFrame:
+
+def what_if(
+    df: pd.DataFrame, col: str, pct: float, metric: str = None, by: str = None, agg: str = "sum"
+) -> pd.DataFrame:
     """
     What-if: clone df, multiply col by (1+pct/100), re-aggregate metric by `by` or overall.
     Returns DataFrame with comparison: category, before, after, delta, delta_pct
@@ -221,7 +270,7 @@ def what_if(df: pd.DataFrame, col: str, pct: float, metric: str = None, by: str 
     try:
         df_before = df.copy()
         df_after = df.copy()
-        df_after[col] = pd.to_numeric(df_after[col], errors="coerce") * (1 + pct/100)
+        df_after[col] = pd.to_numeric(df_after[col], errors="coerce") * (1 + pct / 100)
     except Exception as e:
         raise ValueError(f"What-if failed: {e}")
 
@@ -243,20 +292,43 @@ def what_if(df: pd.DataFrame, col: str, pct: float, metric: str = None, by: str 
             after_val = 0
         delta = after_val - before_val
         delta_pct = (delta / before_val * 100) if before_val != 0 else 0
-        return pd.DataFrame([{"category":"overall", "before": round(before_val,2), "after": round(after_val,2), "delta": round(delta,2), "delta_pct": round(delta_pct,1), "scenario": f"{col} {pct:+}%"}])
+        return pd.DataFrame(
+            [
+                {
+                    "category": "overall",
+                    "before": round(before_val, 2),
+                    "after": round(after_val, 2),
+                    "delta": round(delta, 2),
+                    "delta_pct": round(delta_pct, 1),
+                    "scenario": f"{col} {pct:+}%",
+                }
+            ]
+        )
     else:
         # Groupby
-        agg_func = agg if agg in ("sum","mean","median","count","max","min") else "sum"
+        agg_func = agg if agg in ("sum", "mean", "median", "count", "max", "min") else "sum"
         if agg_func == "count":
             before_agg = df_before.groupby(by).size().reset_index(name="before")
             after_agg = df_after.groupby(by).size().reset_index(name="after")
         else:
             # For mean/median etc, use corresponding
-            before_agg = df_before.groupby(by)[metric].agg(agg_func).reset_index().rename(columns={metric:"before"})
-            after_agg = df_after.groupby(by)[metric].agg(agg_func).reset_index().rename(columns={metric:"after"})
+            before_agg = (
+                df_before.groupby(by)[metric]
+                .agg(agg_func)
+                .reset_index()
+                .rename(columns={metric: "before"})
+            )
+            after_agg = (
+                df_after.groupby(by)[metric]
+                .agg(agg_func)
+                .reset_index()
+                .rename(columns={metric: "after"})
+            )
         merged = pd.merge(before_agg, after_agg, on=by, how="outer").fillna(0)
         merged["delta"] = merged["after"] - merged["before"]
-        merged["delta_pct"] = np.where(merged["before"]!=0, merged["delta"]/merged["before"]*100, 0).round(1)
-        merged = merged.rename(columns={by:"category"})
+        merged["delta_pct"] = np.where(
+            merged["before"] != 0, merged["delta"] / merged["before"] * 100, 0
+        ).round(1)
+        merged = merged.rename(columns={by: "category"})
         merged["scenario"] = f"{col} {pct:+}%"
-        return merged[["category","before","after","delta","delta_pct","scenario"]]
+        return merged[["category", "before", "after", "delta", "delta_pct", "scenario"]]

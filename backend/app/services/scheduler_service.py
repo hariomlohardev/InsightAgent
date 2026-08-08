@@ -6,13 +6,16 @@ from typing import Dict, Any, List, Optional
 from app.config import get_storage_path
 from app.core.storage import _atomic_write_json
 
+
 def _schedules_dir() -> Path:
     d = get_storage_path() / "schedules"
     d.mkdir(parents=True, exist_ok=True)
     return d
 
+
 def _schedule_path(sid: str) -> Path:
     return _schedules_dir() / f"{sid}.json"
+
 
 def _validate_cron(cron: str):
     if not cron or not isinstance(cron, str):
@@ -23,9 +26,11 @@ def _validate_cron(cron: str):
     # lightweight validation via croniter if available else rely on APScheduler
     try:
         from apscheduler.triggers.cron import CronTrigger
+
         CronTrigger.from_crontab(cron)
     except Exception as e:
         raise ValueError(f"Invalid cron '{cron}': {e}")
+
 
 def list_schedules() -> List[Dict[str, Any]]:
     out = []
@@ -36,8 +41,9 @@ def list_schedules() -> List[Dict[str, Any]]:
                 out.append(data)
         except:
             continue
-    out.sort(key=lambda x: x.get("created_at",""), reverse=True)
+    out.sort(key=lambda x: x.get("created_at", ""), reverse=True)
     return out
+
 
 def get_schedule(sid: str) -> Optional[Dict[str, Any]]:
     p = _schedule_path(sid)
@@ -49,13 +55,14 @@ def get_schedule(sid: str) -> Optional[Dict[str, Any]]:
     except:
         return None
 
+
 def create_schedule(data: Dict[str, Any]) -> Dict[str, Any]:
     # data: {dashboard_id?, query?, dataset_id, cron, channel, to, threshold?, name}
-    cron = data.get("cron","").strip()
+    cron = data.get("cron", "").strip()
     _validate_cron(cron)
     channel = (data.get("channel") or "email").lower()
     # Fix duplicate check earlier? channel must be email|slack
-    if channel not in ("email","slack","both"):
+    if channel not in ("email", "slack", "both"):
         raise ValueError("channel must be email|slack|both")
     to_addr = data.get("to") or data.get("recipient") or ""
     if not to_addr.strip():
@@ -95,16 +102,19 @@ def create_schedule(data: Dict[str, Any]) -> Dict[str, Any]:
     # Try to add to APScheduler
     try:
         from app.services.scheduler import add_job
+
         add_job(sched)
     except Exception as e:
         # If scheduler not running yet (tests), just persist
         pass
     return sched
 
+
 def delete_schedule(sid: str) -> bool:
     # Remove from APScheduler
     try:
         from app.services.scheduler import remove_job
+
         remove_job(sid)
     except:
         pass
@@ -113,6 +123,7 @@ def delete_schedule(sid: str) -> bool:
         p.unlink()
         return True
     return False
+
 
 def _record_run(sid: str, status: str, detail: str = "", pdf_bytes_len: int = 0):
     sched = get_schedule(sid)
@@ -127,6 +138,7 @@ def _record_run(sid: str, status: str, detail: str = "", pdf_bytes_len: int = 0)
     sched["last_run"] = now
     sched["updated_at"] = now
     _atomic_write_json(_schedule_path(sid), sched)
+
 
 def run_schedule(sid: str) -> Dict[str, Any]:
     sched = get_schedule(sid)
@@ -151,6 +163,7 @@ def run_schedule(sid: str) -> Dict[str, Any]:
             from app.services.dashboard_service import get_dashboard
             from app.core import storage
             from app.core.exporter import dashboard_to_pdf
+
             dash = get_dashboard(dashboard_id)
             if not dash:
                 raise ValueError(f"Dashboard {dashboard_id} not found")
@@ -163,6 +176,7 @@ def run_schedule(sid: str) -> Dict[str, Any]:
                         from app.core.security import validate_code
                         from app.agent.executor import execute_code
                         from app.core.storage import load_dataset_df
+
                         validate_code(code)
                         df = load_dataset_df(dash["dataset_id"])
                         exec_res = execute_code(code, df)
@@ -177,8 +191,8 @@ def run_schedule(sid: str) -> Dict[str, Any]:
             if threshold and isinstance(threshold, dict):
                 # e.g., {"pct":10, "metric": "Sales", "direction":"drop"}
                 try:
-                    pct = float(threshold.get("pct",10))
-                    direction = threshold.get("direction","drop")
+                    pct = float(threshold.get("pct", 10))
+                    direction = threshold.get("direction", "drop")
                     # Simple: sum of first widget's metric vs last run's sum stored in sched
                     # For now compare sum of last widget result's numeric column sum vs previous
                     total = 0
@@ -188,10 +202,21 @@ def run_schedule(sid: str) -> Dict[str, Any]:
                             # Sum numeric column
                             try:
                                 import pandas as pd
-                                df_tmp = pd.DataFrame(res["data"]) if isinstance(res["data"][0], dict) else pd.DataFrame(res["data"], columns=res["columns"])
-                                num_cols = [c for c in df_tmp.columns if pd.api.types.is_numeric_dtype(df_tmp[c])]
+
+                                df_tmp = (
+                                    pd.DataFrame(res["data"])
+                                    if isinstance(res["data"][0], dict)
+                                    else pd.DataFrame(res["data"], columns=res["columns"])
+                                )
+                                num_cols = [
+                                    c
+                                    for c in df_tmp.columns
+                                    if pd.api.types.is_numeric_dtype(df_tmp[c])
+                                ]
                                 if num_cols:
-                                    total += pd.to_numeric(df_tmp[num_cols[0]], errors="coerce").sum()
+                                    total += pd.to_numeric(
+                                        df_tmp[num_cols[0]], errors="coerce"
+                                    ).sum()
                             except:
                                 pass
                     last_total = sched.get("last_total")
@@ -205,7 +230,9 @@ def run_schedule(sid: str) -> Dict[str, Any]:
                             text_summary = f"Alert: {dashboard_id} increased {change_pct:.1f}% (threshold {pct}%)"
                         else:
                             # Threshold not breached — optionally skip send?
-                            text_summary = f"Checked: {dashboard_id} change {change_pct:.1f}% (no alert)"
+                            text_summary = (
+                                f"Checked: {dashboard_id} change {change_pct:.1f}% (no alert)"
+                            )
                             # Still send? For now we send but note no alert
                             # If you want to skip, uncomment:
                             # _record_run(sid, "skipped", text_summary)
@@ -219,15 +246,20 @@ def run_schedule(sid: str) -> Dict[str, Any]:
                 # Need BACKEND_URL not available here, just build path
                 share_url = f"/api/dashboards/share/{dash['share_slug']}"
             pdf_buf = dashboard_to_pdf(dash, share_url=share_url)
-            text_summary = text_summary or f"Dashboard '{dash['name']}' — {len(dash.get('widgets',[]))} widgets"
+            text_summary = (
+                text_summary
+                or f"Dashboard '{dash['name']}' — {len(dash.get('widgets',[]))} widgets"
+            )
         elif query and dataset_id:
             # Single query schedule
             from app.services.chat_service import process_query_v2
             import asyncio
+
             # process_query_v2 is async; run it
             try:
                 loop = None
                 import asyncio as _asyncio
+
                 try:
                     loop = _asyncio.get_event_loop()
                 except:
@@ -235,6 +267,7 @@ def run_schedule(sid: str) -> Dict[str, Any]:
                 if loop and loop.is_running():
                     # In async context? just create task
                     import concurrent.futures as cf
+
                     with cf.ThreadPoolExecutor() as ex:
                         fut = ex.submit(_asyncio.run, process_query_v2(dataset_id, query))
                         res = fut.result(timeout=20)
@@ -245,19 +278,40 @@ def run_schedule(sid: str) -> Dict[str, Any]:
                 raise e
             # Build a simple PDF from single widget
             from app.core.exporter import dashboard_to_pdf
-            fake_dash = {"name": sched.get("name","Query Report"), "dataset_id": dataset_id, "description": f"Query: {query}", "share_slug": None, "is_public": False, "widgets": [{"title": query[:60], "query": query, "code": res.get("generated_code",""), "result": res.get("result"), "chart": res.get("chart")}]}
+
+            fake_dash = {
+                "name": sched.get("name", "Query Report"),
+                "dataset_id": dataset_id,
+                "description": f"Query: {query}",
+                "share_slug": None,
+                "is_public": False,
+                "widgets": [
+                    {
+                        "title": query[:60],
+                        "query": query,
+                        "code": res.get("generated_code", ""),
+                        "result": res.get("result"),
+                        "chart": res.get("chart"),
+                    }
+                ],
+            }
             pdf_buf = dashboard_to_pdf(fake_dash)
-            text_summary = res.get("insight","")[:300]
+            text_summary = res.get("insight", "")[:300]
         else:
             raise ValueError("Schedule must have dashboard_id or (dataset_id+query)")
 
         # Send via channel
         pdf_bytes = pdf_buf.getvalue() if pdf_buf else None
         results = []
-        channels = [channel] if channel in ("email","slack") else (["email","slack"] if channel=="both" else [channel])
+        channels = (
+            [channel]
+            if channel in ("email", "slack")
+            else (["email", "slack"] if channel == "both" else [channel])
+        )
         for ch in channels:
             if ch == "email":
                 from app.core.senders import send_email
+
                 subject = sched.get("name", "InsightAgent Report")
                 body = f"{text_summary}\n\nSchedule {sid} • cron {sched.get('cron')}\nDashboard: {dashboard_id or query}\nGenerated at {sched.get('updated_at')}"
                 attach = [("report.pdf", pdf_bytes, "application/pdf")] if pdf_bytes else []
@@ -265,6 +319,7 @@ def run_schedule(sid: str) -> Dict[str, Any]:
                 results.append(r)
             elif ch == "slack":
                 from app.core.senders import send_slack
+
                 # to_addr for slack is webhook URL
                 r = send_slack(to_addr, f"*{sched.get('name')}* — {text_summary}")
                 # If we have pdf, we could try to send file via bot token — skip for webhook
@@ -272,12 +327,19 @@ def run_schedule(sid: str) -> Dict[str, Any]:
         # Record success
         detail = "; ".join([str(r.get("status")) for r in results]) + f" — {text_summary[:200]}"
         _record_run(sid, "sent", detail, len(pdf_bytes) if pdf_bytes else 0)
-        return {"status": "sent", "detail": detail, "channels": results, "pdf_bytes": len(pdf_bytes) if pdf_bytes else 0}
+        return {
+            "status": "sent",
+            "detail": detail,
+            "channels": results,
+            "pdf_bytes": len(pdf_bytes) if pdf_bytes else 0,
+        }
     except Exception as e:
         import traceback
+
         traceback.print_exc()
         _record_run(sid, "error", str(e)[:300])
         raise
+
 
 def run_schedule_now(sid: str) -> Dict[str, Any]:
     return run_schedule(sid)

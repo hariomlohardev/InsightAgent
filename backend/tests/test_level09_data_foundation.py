@@ -1,4 +1,5 @@
 """Level 09 — DB CRUD + S3 mock tests (7 new)."""
+
 import os
 import tempfile
 from pathlib import Path
@@ -21,6 +22,7 @@ os.environ["DATABASE_URL"] = TEST_DB
 import importlib
 import app.core.db as dbmod
 import app.core.storage as storagemod
+
 # Reset cached engines
 dbmod._engine = None
 dbmod._SessionLocal = None
@@ -29,10 +31,13 @@ dbmod._SyncSessionLocal = None
 
 # Ensure tables
 from app.core.db import init_db_sync
+
 init_db_sync()
 
 from app.main import app
+
 client = TestClient(app)
+
 
 def _upload_df(df: pd.DataFrame, name: str = "test.csv"):
     with tempfile.NamedTemporaryFile(suffix=".csv", delete=False, mode="w") as tmp:
@@ -43,6 +48,7 @@ def _upload_df(df: pd.DataFrame, name: str = "test.csv"):
     p.unlink(missing_ok=True)
     assert r.status_code == 200, r.text
     return r.json()["id"]
+
 
 def test_db_crud_via_api():
     """Upload, list, get, delete via DB path."""
@@ -65,6 +71,7 @@ def test_db_crud_via_api():
     r = client.get(f"/api/datasets/{did}")
     assert r.status_code == 404
 
+
 def test_db_filesystem_fallback_when_no_db():
     """When DATABASE_URL empty, use_db() False and filesystem still works."""
     orig = os.getenv("DATABASE_URL")
@@ -75,6 +82,7 @@ def test_db_filesystem_fallback_when_no_db():
     dbmod._sync_engine = None
     dbmod._SyncSessionLocal = None
     from app.core.db import use_db
+
     assert use_db() is False
     # Restore
     if orig:
@@ -93,11 +101,13 @@ def test_db_filesystem_fallback_when_no_db():
     dbmod._SyncSessionLocal = None
     init_db_sync()
 
+
 def test_db_isolation_via_storage_direct():
     """Direct storage API with DB."""
     df = pd.DataFrame({"x": [10, 20]})
     # Use storage directly
     from app.core.storage import save_dataset, list_datasets, get_dataset_meta, delete_dataset
+
     with tempfile.NamedTemporaryFile(suffix=".csv", delete=False, mode="w") as tmp:
         df.to_csv(tmp.name, index=False)
         p = Path(tmp.name)
@@ -111,13 +121,19 @@ def test_db_isolation_via_storage_direct():
     assert delete_dataset(did) is True
     assert get_dataset_meta(did) is None
 
+
 def test_health_db_field():
     # Ensure DB is set for this test (isolate from perf fixture which clears DATABASE_URL)
     import os as _os
+
     if not _os.getenv("DATABASE_URL"):
         _os.environ["DATABASE_URL"] = TEST_DB
         import app.core.db as _dbm
-        _dbm._engine = None; _dbm._SessionLocal = None; _dbm._sync_engine = None; _dbm._SyncSessionLocal = None
+
+        _dbm._engine = None
+        _dbm._SessionLocal = None
+        _dbm._sync_engine = None
+        _dbm._SyncSessionLocal = None
         init_db_sync()
     r = client.get("/health")
     assert r.status_code == 200
@@ -125,6 +141,7 @@ def test_health_db_field():
     assert "db" in j
     assert j["db"]["status"] in ("connected", "filesystem")
     assert j["db"]["status"] == "connected"
+
 
 def test_s3_mock_moto():
     """S3 via moto mock — proves STORAGE_BACKEND=s3 path works without real AWS."""
@@ -134,6 +151,7 @@ def test_s3_mock_moto():
         from moto import mock_s3 as mock_aws  # older
     import boto3
     import os as _os
+
     bucket = "test-bucket-09"
     _os.environ["STORAGE_BACKEND"] = "s3"
     _os.environ["S3_BUCKET"] = bucket
@@ -152,6 +170,7 @@ def test_s3_mock_moto():
             df.to_csv(tmp.name, index=False)
             p = Path(tmp.name)
         from app.core.storage import save_dataset, load_dataset_df, delete_dataset
+
         did = save_dataset(p, "s3test.csv")
         p.unlink(missing_ok=True)
         # Verify S3 has file via fsspec or boto (moto intercepts both, but check via load)
@@ -162,6 +181,7 @@ def test_s3_mock_moto():
         # Also verify via fsspec filesystem (more reliable with moto than boto list)
         try:
             import fsspec
+
             fs = fsspec.filesystem("s3")
             s3_path = f"s3://{bucket}/datasets/{did}/data.csv"
             assert fs.exists(s3_path), f"S3 file not found at {s3_path}"
@@ -177,11 +197,13 @@ def test_s3_mock_moto():
     _os.environ.pop("STORAGE_BACKEND", None)
     _os.environ.pop("S3_BUCKET", None)
 
+
 def test_otel_no_crash_when_empty():
     """OTEL with empty endpoint should not crash and /health still works."""
     # Already tested health, just ensure no exception on import
     r = client.get("/health")
     assert r.status_code == 200
+
 
 def test_alembic_migration_exists():
     """001_init exists and creates expected tables."""
@@ -192,6 +214,7 @@ def test_alembic_migration_exists():
     txt = p.read_text()
     for tbl in ["datasets", "dashboards", "users", "workspaces", "billing", "audit_log"]:
         assert tbl in txt, f"table {tbl} not in migration"
+
 
 # Cleanup after module
 def test_cleanup_level09_db():

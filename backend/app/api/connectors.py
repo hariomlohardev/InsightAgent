@@ -7,6 +7,7 @@ from app.core.security import SecurityError
 
 router = APIRouter(prefix="/api/connectors", tags=["connectors"])
 
+
 class ConnectorCreate(BaseModel):
     kind: str  # postgres|mysql|sqlite|bigquery|sheets
     name: Optional[str] = None
@@ -14,6 +15,7 @@ class ConnectorCreate(BaseModel):
     table: Optional[str] = None
     sheet_url: Optional[str] = None
     credentials_json: Optional[str] = None
+
 
 class ConnectorResponse(BaseModel):
     id: str
@@ -28,21 +30,29 @@ class ConnectorResponse(BaseModel):
     # extra
     sample_error: Optional[str] = None
 
+
 class QueryRequest(BaseModel):
     sql: str
     limit: int = 500
+
 
 @router.post("", status_code=201)
 async def create_connector(body: ConnectorCreate):
     kind = (body.kind or "").lower().strip()
     if not kind:
-        raise HTTPException(status_code=400, detail="kind required (postgres|mysql|sqlite|bigquery|sheets)")
+        raise HTTPException(
+            status_code=400, detail="kind required (postgres|mysql|sqlite|bigquery|sheets)"
+        )
     # sheets can use dsn as sheet_url fallback
-    sheet_url = body.sheet_url or (body.dsn if kind in ("sheets","gsheets","google_sheets") else None)
+    sheet_url = body.sheet_url or (
+        body.dsn if kind in ("sheets", "gsheets", "google_sheets") else None
+    )
     dsn = body.dsn
     # For sheets, if user passed sheet_url in dsn, normalize
-    if kind in ("sheets","gsheets","google_sheets") and not sheet_url:
-        raise HTTPException(status_code=400, detail="sheets requires sheet_url (Google Sheets share link)")
+    if kind in ("sheets", "gsheets", "google_sheets") and not sheet_url:
+        raise HTTPException(
+            status_code=400, detail="sheets requires sheet_url (Google Sheets share link)"
+        )
     try:
         meta = connector_service.create_connector(
             kind=kind,
@@ -59,8 +69,10 @@ async def create_connector(body: ConnectorCreate):
         raise HTTPException(status_code=400, detail=str(e))
     except Exception as e:
         import traceback
+
         traceback.print_exc()
         raise HTTPException(status_code=500, detail=str(e))
+
 
 @router.get("")
 async def list_connectors():
@@ -74,17 +86,20 @@ async def list_connectors():
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
+
 @router.get("/{cid}")
 async def get_connector(cid: str):
     c = connector_service.get_connector(cid)
     if not c:
         # Try dataset meta
         from app.core import storage
+
         meta = storage.get_dataset_meta(cid)
         if meta and meta.get("type") == "connector":
             return meta.get("connector") or meta
         raise HTTPException(status_code=404, detail="Connector not found")
     return c
+
 
 @router.delete("/{cid}")
 async def delete_connector(cid: str):
@@ -92,12 +107,14 @@ async def delete_connector(cid: str):
     ok = connector_service.delete_connector(cid)
     if not ok:
         from app.core import storage
+
         # Try dataset delete
         if storage.delete_dataset(cid):
             ok = True
     if not ok:
         raise HTTPException(status_code=404, detail="Connector not found")
     return {"status": "deleted", "id": cid}
+
 
 @router.post("/{cid}/query")
 async def query_connector(cid: str, body: QueryRequest):
@@ -127,8 +144,10 @@ async def query_connector(cid: str, body: QueryRequest):
         raise HTTPException(status_code=400, detail=str(e))
     except Exception as e:
         import traceback
+
         traceback.print_exc()
         raise HTTPException(status_code=500, detail=str(e))
+
 
 # Also expose a test endpoint for connection health
 @router.post("/{cid}/test")

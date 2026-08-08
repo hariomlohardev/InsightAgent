@@ -4,18 +4,31 @@ from pathlib import Path
 from typing import Optional, List, Dict, Any
 from app.config import get_storage_path
 
+
 def _audit_dir() -> Path:
     d = get_storage_path() / "audit"
     d.mkdir(parents=True, exist_ok=True)
     return d
 
-def log(action: str, user: Optional[Dict[str, Any]], dataset_id: Optional[str] = None, dashboard_id: Optional[str] = None, ip: str = "", extra: str = ""):
+
+def log(
+    action: str,
+    user: Optional[Dict[str, Any]],
+    dataset_id: Optional[str] = None,
+    dashboard_id: Optional[str] = None,
+    ip: str = "",
+    extra: str = "",
+):
     try:
         today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
         path = _audit_dir() / f"{today}.jsonl"
         entry = {
             "at": datetime.now(timezone.utc).isoformat(),
-            "user": (user.get("email") if user else "anon") if isinstance(user, dict) else str(user or "anon"),
+            "user": (
+                (user.get("email") if user else "anon")
+                if isinstance(user, dict)
+                else str(user or "anon")
+            ),
             "user_id": user.get("id") if isinstance(user, dict) else None,
             "role": user.get("role") if isinstance(user, dict) else None,
             "action": action,
@@ -29,6 +42,7 @@ def log(action: str, user: Optional[Dict[str, Any]], dataset_id: Optional[str] =
         # Rotate: keep 30 days max
         try:
             import time
+
             now = time.time()
             for p in _audit_dir().glob("*.jsonl"):
                 if now - p.stat().st_mtime > 30 * 86400:
@@ -42,7 +56,10 @@ def log(action: str, user: Optional[Dict[str, Any]], dataset_id: Optional[str] =
     except:
         return None
 
-def list_audit(dataset_id: Optional[str] = None, limit: int = 100, user_email: Optional[str] = None) -> List[Dict[str, Any]]:
+
+def list_audit(
+    dataset_id: Optional[str] = None, limit: int = 100, user_email: Optional[str] = None
+) -> List[Dict[str, Any]]:
     entries: List[Dict[str, Any]] = []
     # Read all jsonl sorted by date desc, but we scan last few files
     files = sorted(_audit_dir().glob("*.jsonl"), reverse=True)
@@ -68,5 +85,5 @@ def list_audit(dataset_id: Optional[str] = None, limit: int = 100, user_email: O
         if len(entries) >= limit:
             break
     # Sort by at desc (file already but cross files)
-    entries.sort(key=lambda x: x.get("at",""), reverse=True)
+    entries.sort(key=lambda x: x.get("at", ""), reverse=True)
     return entries[:limit]

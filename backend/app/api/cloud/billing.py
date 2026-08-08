@@ -8,11 +8,13 @@ from app.core.billing import get_billing, set_plan, get_plan, get_usage
 
 router = APIRouter(prefix="/api/cloud/billing", tags=["cloud-billing"])
 
+
 class CheckoutRequest(BaseModel):
     plan: str
 
+
 @router.get("")
-async def get_billing_endpoint(user = Depends(get_current_user)):
+async def get_billing_endpoint(user=Depends(get_current_user)):
     ws_id = user.get("workspace_id") or "default"
     billing = get_billing(ws_id)
     usage = get_usage(ws_id)
@@ -22,14 +24,22 @@ async def get_billing_endpoint(user = Depends(get_current_user)):
         "team": {"datasets": 500, "queries_per_month": 100000},
         "enterprise": {"datasets": 10000, "queries_per_month": 1000000},
     }
-    plan = billing.get("plan","free")
+    plan = billing.get("plan", "free")
     quotas = quotas_map.get(plan, quotas_map["free"])
-    return {"workspace_id": ws_id, "plan": plan, "status": billing.get("status","active"), "stripe_customer_id": billing.get("stripe_customer_id"), "usage": usage, "quotas": quotas}
+    return {
+        "workspace_id": ws_id,
+        "plan": plan,
+        "status": billing.get("status", "active"),
+        "stripe_customer_id": billing.get("stripe_customer_id"),
+        "usage": usage,
+        "quotas": quotas,
+    }
+
 
 @router.post("/checkout")
-async def checkout(body: CheckoutRequest, request: Request, user = Depends(get_current_user)):
+async def checkout(body: CheckoutRequest, request: Request, user=Depends(get_current_user)):
     plan = body.plan.lower()
-    if plan not in ("pro","team","enterprise","free"):
+    if plan not in ("pro", "team", "enterprise", "free"):
         raise HTTPException(status_code=400, detail="plan must be pro|team|enterprise|free")
     ws_id = user.get("workspace_id") or "default"
     # If Stripe configured, try real checkout else mock
@@ -37,6 +47,7 @@ async def checkout(body: CheckoutRequest, request: Request, user = Depends(get_c
     if stripe_key and stripe_key != "sk_test_mock":
         try:
             import stripe
+
             stripe.api_key = stripe_key
             price_map = {
                 "pro": os.getenv("STRIPE_PRICE_PRO"),
@@ -54,7 +65,7 @@ async def checkout(body: CheckoutRequest, request: Request, user = Depends(get_c
                 success_url=str(request.base_url) + "billing?success=1",
                 cancel_url=str(request.base_url) + "billing?canceled=1",
                 client_reference_id=ws_id,
-                metadata={"workspace_id": ws_id, "plan": plan}
+                metadata={"workspace_id": ws_id, "plan": plan},
             )
             return {"url": session.url, "session_id": session.id}
         except Exception as e:
@@ -64,10 +75,15 @@ async def checkout(body: CheckoutRequest, request: Request, user = Depends(get_c
     # For tests, if plan is free, instantly set
     if plan == "free":
         set_plan(ws_id, "free")
-        return {"url": f"/billing?mock=free&ws={ws_id}", "session_id": f"mock_free_{ws_id}", "mock": True}
+        return {
+            "url": f"/billing?mock=free&ws={ws_id}",
+            "session_id": f"mock_free_{ws_id}",
+            "mock": True,
+        }
     # For pro/team/enterprise, return mock URL but don't yet upgrade until webhook
     mock_url = f"https://checkout.stripe.com/mock/{ws_id}/{plan}"
     return {"url": mock_url, "session_id": f"mock_{ws_id}_{plan}", "mock": True, "plan": plan}
+
 
 @router.post("/webhook")
 async def webhook(request: Request):
@@ -78,6 +94,7 @@ async def webhook(request: Request):
     # Try stripe verification if stripe installed
     try:
         import stripe, json as _j
+
         if webhook_secret and sig and payload:
             try:
                 event = stripe.Webhook.construct_event(payload, sig, webhook_secret)
@@ -90,12 +107,14 @@ async def webhook(request: Request):
         else:
             # mock: parse json
             import json as _j
+
             try:
                 event = _j.loads(payload.decode() if isinstance(payload, bytes) else payload)
             except:
                 event = {}
     except ImportError:
         import json as _j
+
         try:
             event = _j.loads(payload.decode() if isinstance(payload, bytes) else payload)
         except:
@@ -105,7 +124,9 @@ async def webhook(request: Request):
     data_obj = event.get("data", {}).get("object", {}) if isinstance(event, dict) else {}
     # handle checkout.session.completed
     if etype == "checkout.session.completed":
-        ws_id = data_obj.get("client_reference_id") or data_obj.get("metadata", {}).get("workspace_id")
+        ws_id = data_obj.get("client_reference_id") or data_obj.get("metadata", {}).get(
+            "workspace_id"
+        )
         plan = data_obj.get("metadata", {}).get("plan") or "pro"
         if ws_id:
             set_plan(ws_id, plan, stripe_customer_id=data_obj.get("customer"))
@@ -114,7 +135,7 @@ async def webhook(request: Request):
         meta = data_obj.get("metadata", {}) if isinstance(data_obj, dict) else {}
         ws_id = meta.get("workspace_id")
         if ws_id:
-            plan = meta.get("plan","pro")
+            plan = meta.get("plan", "pro")
             set_plan(ws_id, plan)
             return {"status": "ok", "workspace_id": ws_id, "plan": plan}
     # Also support simple mock payload: {"workspace_id": "...", "plan": "..."}
@@ -123,16 +144,20 @@ async def webhook(request: Request):
         return {"status": "ok", "mock": True}
     return {"status": "received", "type": etype}
 
+
 @router.post("/portal")
-async def portal(request: Request, user = Depends(get_current_user)):
+async def portal(request: Request, user=Depends(get_current_user)):
     ws_id = user.get("workspace_id") or "default"
     stripe_key = os.getenv("STRIPE_SECRET_KEY")
     billing = get_billing(ws_id)
     if stripe_key and billing.get("stripe_customer_id"):
         try:
             import stripe
+
             stripe.api_key = stripe_key
-            session = stripe.billing_portal.Session.create(customer=billing["stripe_customer_id"], return_url=str(request.base_url))
+            session = stripe.billing_portal.Session.create(
+                customer=billing["stripe_customer_id"], return_url=str(request.base_url)
+            )
             return {"url": session.url}
         except:
             pass

@@ -8,9 +8,20 @@ import pandas as pd
 from app.core.security import SecurityError
 
 # ---- SQL guard ----
-WRITE_KEYWORDS = ["insert ", "update ", "delete ", "drop ", "create ", "alter ", "truncate ", "grant ", "revoke "]
+WRITE_KEYWORDS = [
+    "insert ",
+    "update ",
+    "delete ",
+    "drop ",
+    "create ",
+    "alter ",
+    "truncate ",
+    "grant ",
+    "revoke ",
+]
 # Allowed to start with SELECT / WITH / SHOW / DESCRIBE / EXPLAIN
 ALLOWED_START = ("select", "with", "show", "describe", "explain", "pragma")
+
 
 def validate_sql(sql: str) -> None:
     """Raise SecurityError if sql contains write/DDL."""
@@ -30,8 +41,10 @@ def validate_sql(sql: str) -> None:
         if kw in s:
             raise SecurityError(f"SQL blocked: contains '{kw.strip().upper()}' — read-only only")
 
+
 # ---- Cache for sheets ----
 _SHEETS_CACHE: Dict[str, Any] = {}  # id -> {df, ts}
+
 
 def _sheets_export_url(sheet_url_or_id: str) -> str:
     # Extract id from full URL
@@ -46,6 +59,7 @@ def _sheets_export_url(sheet_url_or_id: str) -> str:
         if len(doc_id) < 10:
             raise ValueError(f"Invalid Sheets ID/URL: {sheet_url_or_id[:60]}")
     return f"https://docs.google.com/spreadsheets/d/{doc_id}/export?format=csv"
+
 
 def fetch_sheets_df(connector: Dict[str, Any], limit: int = 500, sql: str = None) -> pd.DataFrame:
     sheet_url = connector.get("sheet_url") or connector.get("dsn") or connector.get("table")
@@ -63,15 +77,19 @@ def fetch_sheets_df(connector: Dict[str, Any], limit: int = 500, sql: str = None
         try:
             try:
                 import requests
+
                 r = requests.get(url, timeout=10)
             except ImportError:
                 import httpx
+
                 r = httpx.get(url, timeout=10)
                 is_httpx = True
         except Exception as e:
             raise RuntimeError(f"Sheets fetch failed: {e}")
         if r is None or r.status_code != 200:
-            raise RuntimeError(f"Sheets fetch failed ({getattr(r, 'status_code', 'no response')}). Make sheet public (Anyone with link) or add SHEETS_API_KEY in .env (private sheets need OAuth — coming in L7). URL: {url[:60]}")
+            raise RuntimeError(
+                f"Sheets fetch failed ({getattr(r, 'status_code', 'no response')}). Make sheet public (Anyone with link) or add SHEETS_API_KEY in .env (private sheets need OAuth — coming in L7). URL: {url[:60]}"
+            )
         text = r.text
         if not text.strip():
             raise RuntimeError("Sheets returned empty CSV")
@@ -80,6 +98,7 @@ def fetch_sheets_df(connector: Dict[str, Any], limit: int = 500, sql: str = None
         # Also cache to disk for persistence
         try:
             from app.config import get_storage_path
+
             cache_dir = get_storage_path() / "connectors" / "cache"
             cache_dir.mkdir(parents=True, exist_ok=True)
             df.to_csv(cache_dir / f"{cache_id}.csv", index=False)
@@ -89,6 +108,7 @@ def fetch_sheets_df(connector: Dict[str, Any], limit: int = 500, sql: str = None
     if sql:
         validate_sql(sql)
         import duckdb
+
         con = duckdb.connect()
         con.register("df", df)
         try:
@@ -100,11 +120,13 @@ def fetch_sheets_df(connector: Dict[str, Any], limit: int = 500, sql: str = None
         return df.head(limit)
     return df
 
+
 def fetch_sqlite_df(connector: Dict[str, Any], limit: int = 500, sql: str = None) -> pd.DataFrame:
     dsn = connector.get("dsn") or connector.get("db_path") or ":memory:"
     table = connector.get("table")
     # For tests, support dsn = path to csv-loaded :memory: setup is handled via table existence
     import sqlite3
+
     # If dsn is a file path that doesn't exist, error
     # But for :memory: we need to check if connector has _memory_init marker — but we'll just connect fresh and check
     # To support CI, if dsn == ":memory:" and connector has "init_sql" we run it
@@ -132,6 +154,7 @@ def fetch_sqlite_df(connector: Dict[str, Any], limit: int = 500, sql: str = None
     finally:
         conn.close()
 
+
 def fetch_postgres_df(connector: Dict[str, Any], limit: int = 500, sql: str = None) -> pd.DataFrame:
     dsn = connector.get("dsn")
     if not dsn:
@@ -145,10 +168,11 @@ def fetch_postgres_df(connector: Dict[str, Any], limit: int = 500, sql: str = No
         # Validate table
         if not re.match(r"^[a-zA-Z_][a-zA-Z0-9_\"\.]*$", table):
             raise ValueError(f"Invalid table: {table}")
-        sql = f'SELECT * FROM {table} LIMIT {int(limit) if limit else 500}'
+        sql = f"SELECT * FROM {table} LIMIT {int(limit) if limit else 500}"
     # Try sqlalchemy if available, else psycopg2
     try:
         from sqlalchemy import create_engine, text
+
         engine = create_engine(dsn, connect_args={"connect_timeout": 5})
         with engine.connect() as conn:
             # For postgres, we can try setting read-only transaction
@@ -159,15 +183,19 @@ def fetch_postgres_df(connector: Dict[str, Any], limit: int = 500, sql: str = No
     # Fallback psycopg2
     try:
         import psycopg2
+
         conn = psycopg2.connect(dsn, connect_timeout=5)
         try:
             return pd.read_sql(sql, conn)
         finally:
             conn.close()
     except ImportError as e:
-        raise RuntimeError("Postgres driver not installed: pip install psycopg2-binary sqlalchemy — or use SQLite for testing")
+        raise RuntimeError(
+            "Postgres driver not installed: pip install psycopg2-binary sqlalchemy — or use SQLite for testing"
+        )
     except Exception as e:
         raise RuntimeError(f"Postgres query failed: {e}")
+
 
 def fetch_mysql_df(connector: Dict[str, Any], limit: int = 500, sql: str = None) -> pd.DataFrame:
     dsn = connector.get("dsn")
@@ -184,6 +212,7 @@ def fetch_mysql_df(connector: Dict[str, Any], limit: int = 500, sql: str = None)
         sql = f"SELECT * FROM `{table}` LIMIT {int(limit) if limit else 500}"
     try:
         from sqlalchemy import create_engine, text
+
         engine = create_engine(dsn, connect_args={"connect_timeout": 5})
         with engine.connect() as conn:
             return pd.read_sql(text(sql), conn)
@@ -191,18 +220,27 @@ def fetch_mysql_df(connector: Dict[str, Any], limit: int = 500, sql: str = None)
         pass
     try:
         import pymysql
+
         # dsn for pymysql is not url; we try to parse
         # For now error if no sqlalchemy
         raise RuntimeError("MySQL driver not installed: pip install pymysql sqlalchemy")
     except Exception as e:
         raise RuntimeError(f"MySQL query failed: {e}")
 
+
 def fetch_bigquery_df(connector: Dict[str, Any], limit: int = 500, sql: str = None) -> pd.DataFrame:
     # Check credentials
     import os
-    creds = connector.get("credentials_json") or os.getenv("GOOGLE_APPLICATION_CREDENTIALS") or os.getenv("BIGQUERY_CREDENTIALS")
+
+    creds = (
+        connector.get("credentials_json")
+        or os.getenv("GOOGLE_APPLICATION_CREDENTIALS")
+        or os.getenv("BIGQUERY_CREDENTIALS")
+    )
     if not creds:
-        raise RuntimeError("BigQuery not configured: set GOOGLE_APPLICATION_CREDENTIALS (path to service JSON) or pass credentials_json — see docs. Returning 501.")
+        raise RuntimeError(
+            "BigQuery not configured: set GOOGLE_APPLICATION_CREDENTIALS (path to service JSON) or pass credentials_json — see docs. Returning 501."
+        )
     if sql:
         validate_sql(sql)
     else:
@@ -212,13 +250,17 @@ def fetch_bigquery_df(connector: Dict[str, Any], limit: int = 500, sql: str = No
         sql = f"SELECT * FROM `{table}` LIMIT {int(limit) if limit else 500}"
     try:
         import pandas_gbq
+
         # pandas_gbq will use credentials
         # We pass sql directly
         return pandas_gbq.read_gbq(sql)
     except ImportError:
-        raise RuntimeError("BigQuery driver not installed: pip install pandas-gbq google-cloud-bigquery")
+        raise RuntimeError(
+            "BigQuery driver not installed: pip install pandas-gbq google-cloud-bigquery"
+        )
     except Exception as e:
         raise RuntimeError(f"BigQuery query failed: {e}")
+
 
 def fetch_df(connector: Dict[str, Any], limit: int = 500, sql: str = None) -> pd.DataFrame:
     kind = (connector.get("kind") or connector.get("type") or "").lower()
@@ -233,4 +275,6 @@ def fetch_df(connector: Dict[str, Any], limit: int = 500, sql: str = None) -> pd
     elif kind in ("sheets", "gsheets", "google_sheets"):
         return fetch_sheets_df(connector, limit=limit, sql=sql)
     else:
-        raise ValueError(f"Unknown connector kind: {kind}. Supported: postgres, mysql, sqlite, bigquery, sheets")
+        raise ValueError(
+            f"Unknown connector kind: {kind}. Supported: postgres, mysql, sqlite, bigquery, sheets"
+        )

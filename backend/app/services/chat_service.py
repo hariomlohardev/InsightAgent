@@ -3,6 +3,7 @@ from app.core import storage
 from app.core.profiling import profile_dataframe
 from app.agent import planner, coder, executor, explainer
 
+
 async def process_query(dataset_id: str, query: str, conversation_id: str = None) -> Dict[str, Any]:
     """Full agent pipeline: plan -> code -> execute -> explain. Handles cleaning via wrangle diff."""
     df = storage.load_dataset_df(dataset_id)
@@ -21,6 +22,7 @@ async def process_query(dataset_id: str, query: str, conversation_id: str = None
             from app.core.wrangle import diff_dataframes
             from app.core.security import get_safe_globals
             import pandas as pd
+
             safe_globals = get_safe_globals(df)
             local_vars = {}
             exec(code, safe_globals, local_vars)
@@ -41,7 +43,7 @@ async def process_query(dataset_id: str, query: str, conversation_id: str = None
         exec_res.get("result_json"),
         exec_res.get("error"),
         profile,
-        exec_res.get("stdout", "")
+        exec_res.get("stdout", ""),
     )
 
     # Save conversation
@@ -98,12 +100,17 @@ async def process_query(dataset_id: str, query: str, conversation_id: str = None
         "stdout": exec_res.get("stdout"),
     }
 
+
 # BF-03 chat cache <5ms HIT via chat:{id}:{qhash}:{version}
-async def process_query_v2(dataset_id: str, query: str, conversation_id: str = None) -> Dict[str, Any]:
+async def process_query_v2(
+    dataset_id: str, query: str, conversation_id: str = None
+) -> Dict[str, Any]:
     from app.core import storage as st
     import uuid, hashlib, time
+
     try:
         from app.core.cache import get as cache_get, set as cache_set, cache_key
+
         _cache_available = True
     except Exception:
         _cache_available = False
@@ -122,18 +129,49 @@ async def process_query_v2(dataset_id: str, query: str, conversation_id: str = N
             return _cached
     df = st.load_dataset_df(dataset_id)
     profile = profile_dataframe(df)
-    if is_connector and not query.strip().lower().startswith(("select","with")):
+    if is_connector and not query.strip().lower().startswith(("select", "with")):
         # Inject hint so planner/coder treat as sql — preserve analytics intent
         ql = query.lower()
-        if not any(k in ql for k in ["forecast","predict","outlier","anomal","segment","cohort","what if","why","explain","correlation","heatmap"]):
+        if not any(
+            k in ql
+            for k in [
+                "forecast",
+                "predict",
+                "outlier",
+                "anomal",
+                "segment",
+                "cohort",
+                "what if",
+                "why",
+                "explain",
+                "correlation",
+                "heatmap",
+            ]
+        ):
             profile["_intent_hint"] = "sql"
             profile["_intent"] = "sql"
     intent = await planner.plan(query, profile)
     # L4/L5: override intent for connectors so NL queries are treated as sql (enables NL→SQL) — but not for analytics
     if is_connector:
-        if intent.get("intent") != "analytics" and not query.strip().lower().startswith(("select","with")):
+        if intent.get("intent") != "analytics" and not query.strip().lower().startswith(
+            ("select", "with")
+        ):
             # Don't hijack analytics queries like forecast/why/outlier on connectors — keep analytics intent
-            is_analytics_q = any(k in query.lower() for k in ["forecast","predict","outlier","segment","cohort","what if","why","explain","correlation","heatmap"])
+            is_analytics_q = any(
+                k in query.lower()
+                for k in [
+                    "forecast",
+                    "predict",
+                    "outlier",
+                    "segment",
+                    "cohort",
+                    "what if",
+                    "why",
+                    "explain",
+                    "correlation",
+                    "heatmap",
+                ]
+            )
             if not is_analytics_q:
                 intent["intent"] = "sql"
                 intent["chart_type"] = "bar"
@@ -142,7 +180,13 @@ async def process_query_v2(dataset_id: str, query: str, conversation_id: str = N
     code = code_res["code"]
     code_exp = code_res.get("explanation", "")
     exec_res = executor.execute_code(code, df)
-    insight = await explainer.explain(query, exec_res.get("result_json"), exec_res.get("error"), profile, exec_res.get("stdout", ""))
+    insight = await explainer.explain(
+        query,
+        exec_res.get("result_json"),
+        exec_res.get("error"),
+        profile,
+        exec_res.get("stdout", ""),
+    )
 
     # Conversation handling
     if not conversation_id:
@@ -157,6 +201,7 @@ async def process_query_v2(dataset_id: str, query: str, conversation_id: str = N
             from app.core.wrangle import diff_dataframes
             from app.core.security import get_safe_globals
             import pandas as pd
+
             safe_globals = get_safe_globals(df)
             local_vars = {}
             exec(code, safe_globals, local_vars)

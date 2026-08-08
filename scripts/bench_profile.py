@@ -1,4 +1,5 @@
 """Bench profile — 1M/10M CSV <2s via polars scan_csv. BF-01 adds --json --per-col."""
+
 import time
 import argparse
 import json
@@ -7,8 +8,10 @@ from pathlib import Path
 import pandas as pd
 import numpy as np
 
+
 def gen_csv(path: Path, rows: int, cols: int = 5, quiet: bool = False):
     import sys
+
     if not quiet:
         print(f"Generating {rows} rows x {cols} cols -> {path} ...", file=sys.stderr)
     chunk = 500_000
@@ -16,25 +19,32 @@ def gen_csv(path: Path, rows: int, cols: int = 5, quiet: bool = False):
     for start in range(0, rows, chunk):
         end = min(start + chunk, rows)
         n = end - start
-        df = pd.DataFrame({
-            "id": np.arange(start, end),
-            "value": np.random.randn(n) * 100,
-            "category": np.random.choice(["A","B","C","D"], n),
-            "date": pd.date_range("2020-01-01", periods=n, freq="h").astype(str)[:n],
-            "flag": np.random.choice([True, False], n),
-        })
+        df = pd.DataFrame(
+            {
+                "id": np.arange(start, end),
+                "value": np.random.randn(n) * 100,
+                "category": np.random.choice(["A", "B", "C", "D"], n),
+                "date": pd.date_range("2020-01-01", periods=n, freq="h").astype(str)[:n],
+                "flag": np.random.choice([True, False], n),
+            }
+        )
         if cols < 5:
             df = df.iloc[:, :cols]
-        df.to_csv(path, mode="w" if not header_written else "a", header=not header_written, index=False)
+        df.to_csv(
+            path, mode="w" if not header_written else "a", header=not header_written, index=False
+        )
         header_written = True
         if not quiet:
             print(f"  {end}/{rows}", file=sys.stderr)
 
+
 def load_dataset_df_csv(csv_path: Path, use_polars: bool = False):
     import pandas as pd
+
     if use_polars:
         try:
             import polars as pl
+
             try:
                 # BF-01: try streaming, fallback to plain collect
                 return pl.scan_csv(str(csv_path), infer_schema_length=1000).collect().to_pandas()
@@ -43,7 +53,7 @@ def load_dataset_df_csv(csv_path: Path, use_polars: bool = False):
         except ImportError:
             pass
     fsize = csv_path.stat().st_size
-    if fsize > 50*1024*1024:
+    if fsize > 50 * 1024 * 1024:
         chunks = []
         for chunk in pd.read_csv(csv_path, chunksize=100000):
             chunks.append(chunk)
@@ -51,6 +61,7 @@ def load_dataset_df_csv(csv_path: Path, use_polars: bool = False):
                 break
         return pd.concat(chunks, ignore_index=True)
     return pd.read_csv(csv_path)
+
 
 def _time_per_col(df: pd.DataFrame):
     """Return per-col timing for B1 diagnostics: null_ms, nunique_ms, value_counts_ms."""
@@ -75,16 +86,20 @@ def _time_per_col(df: pd.DataFrame):
         except Exception:
             pass
         vc_ms = (time.time() - t0) * 1000
-        per_col.append({
-            "name": str(col),
-            "null_ms": round(null_ms, 2),
-            "nunique_ms": round(nunique_ms, 2),
-            "value_counts_ms": round(vc_ms, 2),
-        })
+        per_col.append(
+            {
+                "name": str(col),
+                "null_ms": round(null_ms, 2),
+                "nunique_ms": round(nunique_ms, 2),
+                "value_counts_ms": round(vc_ms, 2),
+            }
+        )
     return per_col
+
 
 def bench_profile(csv_path: Path, use_polars: bool, per_col: bool = False):
     import os
+
     orig = os.getenv("USE_POLARS")
     os.environ["USE_POLARS"] = "true" if use_polars else "false"
     # BF-01: also support DEBUG_PROFILE for breakdown
@@ -99,6 +114,7 @@ def bench_profile(csv_path: Path, use_polars: bool, per_col: bool = False):
         per_col_data = _time_per_col(df) if per_col else []
         # time profile
         from app.core.profiling import profile_dataframe
+
         # force no cache for bench
         t1 = time.time()
         prof = profile_dataframe(df, dataset_id="bench", version=0, use_cache=False)
@@ -149,13 +165,16 @@ def bench_profile(csv_path: Path, use_polars: bool, per_col: bool = False):
             else:
                 os.environ["DEBUG_PROFILE"] = debug_before
 
+
 if __name__ == "__main__":
     ap = argparse.ArgumentParser(description="Bench profile 1M/10M")
     ap.add_argument("--rows", type=int, default=1_000_000, help="1M or 10M")
     ap.add_argument("--cols", type=int, default=5)
     ap.add_argument("--no-polars", action="store_true", help="skip polars run")
     ap.add_argument("--json", action="store_true", help="output machine-readable JSON to stdout")
-    ap.add_argument("--per-col", action="store_true", help="include per-col breakdown for BF-01 flame")
+    ap.add_argument(
+        "--per-col", action="store_true", help="include per-col breakdown for BF-01 flame"
+    )
     ap.add_argument("--quiet", action="store_true", help="suppress human logs when --json")
     ap.add_argument("--out", type=str, default=None, help="write JSON to file instead of stdout")
     args = ap.parse_args()
@@ -168,9 +187,13 @@ if __name__ == "__main__":
         r = bench_profile(tmp, use_polars=True, per_col=args.per_col)
         results.append(r)
         if not args.json and not args.quiet:
-            print(f"Load {tmp.name} use_polars=True: {r['read_ms']:.0f}ms shape=({r['rows']}, {r['cols']})")
+            print(
+                f"Load {tmp.name} use_polars=True: {r['read_ms']:.0f}ms shape=({r['rows']}, {r['cols']})"
+            )
             print(f"Profile use_polars=True: {r['profile_ms']:.0f}ms cols={r['cols']}")
-            print(f"Total {r['total_ms']:.0f}ms (target <2000ms for 10M with polars, <3000ms with pandas)")
+            print(
+                f"Total {r['total_ms']:.0f}ms (target <2000ms for 10M with polars, <3000ms with pandas)"
+            )
             if args.per_col:
                 print(f"  per_col: {r['per_col']}")
                 print(f"  duplicated_ms: {r['duplicated_ms']} describe_ms: {r['describe_ms']}")
@@ -179,17 +202,24 @@ if __name__ == "__main__":
     r2 = bench_profile(tmp, use_polars=False, per_col=args.per_col)
     results.append(r2)
     if not args.json and not args.quiet:
-        print(f"Load {tmp.name} use_polars=False: {r2['read_ms']:.0f}ms shape=({r2['rows']}, {r2['cols']})")
+        print(
+            f"Load {tmp.name} use_polars=False: {r2['read_ms']:.0f}ms shape=({r2['rows']}, {r2['cols']})"
+        )
         print(f"Profile use_polars=False: {r2['profile_ms']:.0f}ms cols={r2['cols']}")
         print(f"Total {r2['total_ms']:.0f}ms")
         if args.per_col:
             print(f"  per_col: {r2['per_col']}")
             print(f"  duplicated_ms: {r2['duplicated_ms']} describe_ms: {r2['describe_ms']}")
     if args.json:
-        out = results[0] if len(results)==1 and args.no_polars else results
+        out = results[0] if len(results) == 1 and args.no_polars else results
         # if two results, output as dict with keys polars/pandas for easy grep
-        if len(results)==2:
-            payload = {"polars": results[0], "pandas": results[1], "rows": args.rows, "cols": args.cols}
+        if len(results) == 2:
+            payload = {
+                "polars": results[0],
+                "pandas": results[1],
+                "rows": args.rows,
+                "cols": args.cols,
+            }
         else:
             payload = results[0] if results else {}
         s = json.dumps(payload, indent=2)

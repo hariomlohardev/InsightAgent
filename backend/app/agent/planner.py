@@ -6,13 +6,81 @@ from app.agent.prompts import SYSTEM_PLANNER_PROMPT
 from app.core.llm import get_llm, extract_json
 
 # Heuristic keywords — L5 adds analytics
-VISUAL_KEYWORDS = ["chart", "plot", "graph", "visual", "show", "display", "bar", "line", "pie", "scatter", "histogram", "heatmap", "trend"]
-AGG_KEYWORDS = ["sum", "total", "average", "mean", "median", "count", "max", "min", "group by", "groupby", "aggregate"]
+VISUAL_KEYWORDS = [
+    "chart",
+    "plot",
+    "graph",
+    "visual",
+    "show",
+    "display",
+    "bar",
+    "line",
+    "pie",
+    "scatter",
+    "histogram",
+    "heatmap",
+    "trend",
+]
+AGG_KEYWORDS = [
+    "sum",
+    "total",
+    "average",
+    "mean",
+    "median",
+    "count",
+    "max",
+    "min",
+    "group by",
+    "groupby",
+    "aggregate",
+]
 FILTER_KEYWORDS = ["top", "filter", "where", "sort", "highest", "lowest", "greater", "less"]
-PROFILE_KEYWORDS = ["describe", "info", "profile", "columns", "overview", "summary", "shape", "head", "sample"]
+PROFILE_KEYWORDS = [
+    "describe",
+    "info",
+    "profile",
+    "columns",
+    "overview",
+    "summary",
+    "shape",
+    "head",
+    "sample",
+]
 INSIGHT_KEYWORDS = ["why", "explain", "insight", "trend", "relationship", "compare", "analysis"]
-CLEANING_KEYWORDS = ["clean", "remove null", "duplicate", "fill", "drop", "rename", "convert", "trim", "standardize", "split", "merge", "pivot", "melt"]
-ANALYTICS_KEYWORDS = ["forecast", "predict", "next", "outlier", "anomal", "segment", "cohort", "breakdown", "what if", "what-if", "whatif", "correlation", "heatmap", "why", "reason", "drop", "increase"]
+CLEANING_KEYWORDS = [
+    "clean",
+    "remove null",
+    "duplicate",
+    "fill",
+    "drop",
+    "rename",
+    "convert",
+    "trim",
+    "standardize",
+    "split",
+    "merge",
+    "pivot",
+    "melt",
+]
+ANALYTICS_KEYWORDS = [
+    "forecast",
+    "predict",
+    "next",
+    "outlier",
+    "anomal",
+    "segment",
+    "cohort",
+    "breakdown",
+    "what if",
+    "what-if",
+    "whatif",
+    "correlation",
+    "heatmap",
+    "why",
+    "reason",
+    "drop",
+    "increase",
+]
 # Note: "outlier" moved from cleaning to analytics — planner prioritizes analytics before cleaning
 
 CHART_MAP = {
@@ -24,30 +92,35 @@ CHART_MAP = {
     "heatmap": ["heatmap", "correlation matrix", "corr"],
 }
 
+
 def heuristic_plan(query: str, profile: Dict[str, Any]) -> Dict[str, Any]:
     q = query.lower()
     intent = "visualization"  # default
     # Analytics has priority for specific L5 intents (why/forecast/outlier/segment/what-if)
     # Check analytics before other fallbacks but after SQL
     # SQL detection — highest priority
-    if q.strip().startswith("select") or q.strip().startswith("with") or (" from " in q and "select" in q):
+    if (
+        q.strip().startswith("select")
+        or q.strip().startswith("with")
+        or (" from " in q and "select" in q)
+    ):
         intent = "sql"
     elif any(k in q for k in ANALYTICS_KEYWORDS):
         # Distinguish correlation -> still visualization but we mark analytics for coder
         # Forecast/what-if/outlier/segment/why all go to analytics
-        if any(x in q for x in ["forecast","predict","next"]):
+        if any(x in q for x in ["forecast", "predict", "next"]):
             intent = "analytics"
-        elif any(x in q for x in ["outlier","anomal"]):
+        elif any(x in q for x in ["outlier", "anomal"]):
             intent = "analytics"
-        elif any(x in q for x in ["segment","cohort","breakdown"]):
+        elif any(x in q for x in ["segment", "cohort", "breakdown"]):
             intent = "analytics"
-        elif any(x in q for x in ["what if","what-if","whatif"]):
+        elif any(x in q for x in ["what if", "what-if", "whatif"]):
             intent = "analytics"
-        elif any(x in q for x in ["why","explain","reason","drop","increase"]):
+        elif any(x in q for x in ["why", "explain", "reason", "drop", "increase"]):
             # Only treat as analytics if question-like
-            if "?" in q or any(w in q for w in ["why","explain","reason"]):
+            if "?" in q or any(w in q for w in ["why", "explain", "reason"]):
                 intent = "analytics"
-            elif any(w in q for w in ["drop","fall","decrease","increase"]):
+            elif any(w in q for w in ["drop", "fall", "decrease", "increase"]):
                 intent = "analytics"
             else:
                 intent = "insight"
@@ -76,7 +149,10 @@ def heuristic_plan(query: str, profile: Dict[str, Any]) -> Dict[str, Any]:
     # Fallback: if intent is visualization and no chart detected, infer from data
     if intent == "visualization" and chart_type == "none":
         # If categorical + numeric -> bar, if time-like -> line
-        if len(profile.get("categorical_columns", [])) > 0 and len(profile.get("numeric_columns", [])) > 0:
+        if (
+            len(profile.get("categorical_columns", [])) > 0
+            and len(profile.get("numeric_columns", [])) > 0
+        ):
             chart_type = "bar"
         elif len(profile.get("numeric_columns", [])) >= 2:
             chart_type = "scatter"
@@ -103,12 +179,13 @@ def heuristic_plan(query: str, profile: Dict[str, Any]) -> Dict[str, Any]:
         "aggregation": agg,
     }
 
+
 async def plan(query: str, profile: Dict[str, Any]) -> Dict[str, Any]:
     """Return intent plan. Use LLM if available else heuristic. Supports all providers."""
     llm = get_llm()
     if not llm:
         return heuristic_plan(query, profile)
-    
+
     try:
         content = await llm.chat(
             SYSTEM_PLANNER_PROMPT,

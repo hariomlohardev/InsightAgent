@@ -8,6 +8,7 @@ load_dotenv()
 # Project root is two levels above this file's parent (backend/app -> backend -> root)
 PROJECT_ROOT = Path(__file__).resolve().parent.parent.parent
 
+
 class Settings(BaseSettings):
     app_name: str = "InsightAgent"
     version: str = "0.1.0"
@@ -17,7 +18,9 @@ class Settings(BaseSettings):
     storage_path: Path = Path(os.getenv("STORAGE_PATH", str(PROJECT_ROOT / "storage")))
     max_upload_mb: int = int(os.getenv("MAX_UPLOAD_MB", "100"))
     # LLM providers
-    llm_provider: str = os.getenv("LLM_PROVIDER", "auto")  # auto, openai, groq, gemini, claude, ollama
+    llm_provider: str = os.getenv(
+        "LLM_PROVIDER", "auto"
+    )  # auto, openai, groq, gemini, claude, ollama
     llm_model: str | None = os.getenv("LLM_MODEL")
     openai_api_key: str | None = os.getenv("OPENAI_API_KEY")
     openai_model: str = os.getenv("OPENAI_MODEL", "gpt-4o-mini")
@@ -31,11 +34,11 @@ class Settings(BaseSettings):
     ollama_model: str = os.getenv("OLLAMA_MODEL", "llama3.1:8b")
     execution_timeout_sec: int = 5
     # L7 Enterprise
-    auth_required: bool = os.getenv("AUTH_REQUIRED", "false").lower() in ("true","1","yes")
-    enterprise: bool = os.getenv("ENTERPRISE", "false").lower() in ("true","1","yes")
+    auth_required: bool = os.getenv("AUTH_REQUIRED", "false").lower() in ("true", "1", "yes")
+    enterprise: bool = os.getenv("ENTERPRISE", "false").lower() in ("true", "1", "yes")
     jwt_secret: str | None = os.getenv("JWT_SECRET")
     # L8 Cloud
-    cloud: bool = os.getenv("CLOUD", "false").lower() in ("true","1","yes")
+    cloud: bool = os.getenv("CLOUD", "false").lower() in ("true", "1", "yes")
     stripe_secret_key: str | None = os.getenv("STRIPE_SECRET_KEY")
     stripe_webhook_secret: str | None = os.getenv("STRIPE_WEBHOOK_SECRET")
     stripe_price_pro: str | None = os.getenv("STRIPE_PRICE_PRO")
@@ -53,6 +56,7 @@ class Settings(BaseSettings):
         env_file = ".env"
         extra = "ignore"
 
+
 settings = Settings()
 
 # Ensure storage_path is resolved correctly
@@ -63,10 +67,15 @@ else:
     settings.storage_path = settings.storage_path.resolve()
 
 import contextvars
-_workspace_id_ctx: contextvars.ContextVar[str] = contextvars.ContextVar("workspace_id", default="default")
+
+_workspace_id_ctx: contextvars.ContextVar[str] = contextvars.ContextVar(
+    "workspace_id", default="default"
+)
+
 
 def set_workspace_id(ws_id: str):
     _workspace_id_ctx.set(ws_id or "default")
+
 
 def get_workspace_id() -> str:
     try:
@@ -74,21 +83,24 @@ def get_workspace_id() -> str:
     except LookupError:
         return "default"
 
+
 def is_cloud() -> bool:
-    return os.getenv("CLOUD", "false").lower() in ("true","1","yes")
+    return os.getenv("CLOUD", "false").lower() in ("true", "1", "yes")
+
 
 def get_storage_path() -> Path:
     base = settings.storage_path
     if is_cloud():
         ws_id = get_workspace_id()
         # sanitize ws_id
-        ws_id = "".join(c for c in ws_id if c.isalnum() or c in ("-","_"))[:32] or "default"
+        ws_id = "".join(c for c in ws_id if c.isalnum() or c in ("-", "_"))[:32] or "default"
         p = base / "workspaces" / ws_id
         p.mkdir(parents=True, exist_ok=True)
         # ensure default workspace also has plain storage layout for migration? Not needed
         return p
     base.mkdir(parents=True, exist_ok=True)
     return base
+
 
 def get_base_storage_path() -> Path:
     """Root storage regardless of workspace (for admin stats)."""

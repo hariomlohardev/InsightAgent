@@ -10,6 +10,7 @@ Supports:
   - postgresql+psycopg://... (sync fallback)
   - sqlite+aiosqlite:///./test.db (CI/tests)
 """
+
 import os
 import logging
 
@@ -20,6 +21,7 @@ try:
     from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession, async_sessionmaker
     from sqlalchemy.orm import DeclarativeBase
     from sqlalchemy import Column, String, Integer, DateTime, Text, JSON, Boolean
+
     _SA_AVAILABLE = True
 except Exception as e:
     logger.info(f"SQLAlchemy not available, filesystem fallback: {e}")
@@ -29,6 +31,7 @@ except Exception as e:
 
 _engine = None
 _SessionLocal = None
+
 
 def use_db() -> bool:
     """True only when DATABASE_URL set and SQLAlchemy available and engine can be created."""
@@ -41,9 +44,11 @@ def use_db() -> bool:
     # Allow sqlite fallback even if url looks like postgres but driver missing
     return True
 
+
 def get_database_url() -> str | None:
     url = os.getenv("DATABASE_URL", "").strip()
     return url or None
+
 
 def _normalize_url(url: str) -> str:
     # Handle plain postgresql:// -> postgresql+asyncpg:// for async
@@ -52,6 +57,7 @@ def _normalize_url(url: str) -> str:
     if url.startswith("postgres://"):
         return url.replace("postgres://", "postgresql+asyncpg://", 1)
     return url
+
 
 def get_engine():
     global _engine
@@ -71,6 +77,7 @@ def get_engine():
         logger.warning(f"Failed to create engine for {url}: {e}")
         return None
 
+
 def get_sessionmaker():
     global _SessionLocal
     if _SessionLocal is not None:
@@ -85,17 +92,23 @@ def get_sessionmaker():
         logger.warning(f"Failed to create sessionmaker: {e}")
         return None
 
+
 # Base for models
 if _SA_AVAILABLE:
+
     class Base(DeclarativeBase):
         pass
+
 else:
+
     class Base:  # type: ignore
         pass
+
 
 # --- Models matching current JSON shape (id TEXT PK, workspace_id, meta JSONB) ---
 if _SA_AVAILABLE:
     from sqlalchemy import JSON as SA_JSON
+
     # Use generic JSON for sqlite compat; postgres will map to JSONB via dialect
     class DatasetRow(Base):
         __tablename__ = "datasets"
@@ -154,9 +167,11 @@ if _SA_AVAILABLE:
         ip = Column(String, nullable=True)
         extra = Column(Text, nullable=True)
         at = Column(DateTime)
+
 else:
     # placeholders when SA not available
     DatasetRow = DashboardRow = UserRow = WorkspaceRow = BillingRow = AuditRow = None  # type: ignore
+
 
 async def get_session():
     """FastAPI dependency: yields AsyncSession or None when use_db()==False."""
@@ -166,6 +181,7 @@ async def get_session():
         return
     async with sm() as session:
         yield session
+
 
 async def init_db():
     """Create tables if DATABASE_URL set. No-op otherwise. Safe to call on startup."""
@@ -181,6 +197,7 @@ async def init_db():
     except Exception as e:
         logger.warning(f"init_db failed: {e}")
 
+
 def db_latency_ms() -> float | None:
     """Sync helper for /health: returns None when no DB, else ping latency ms (sync fallback)."""
     if not use_db():
@@ -191,7 +208,10 @@ def db_latency_ms() -> float | None:
     try:
         import psycopg  # type: ignore
         import time
-        sync_url = url.replace("postgresql+asyncpg://", "postgresql://").replace("postgresql+psycopg://", "postgresql://")
+
+        sync_url = url.replace("postgresql+asyncpg://", "postgresql://").replace(
+            "postgresql+psycopg://", "postgresql://"
+        )
         start = time.time()
         with psycopg.connect(sync_url, connect_timeout=2) as conn:
             with conn.cursor() as cur:
@@ -201,9 +221,11 @@ def db_latency_ms() -> float | None:
     except Exception:
         return None
 
+
 # --- Sync engine for storage.py (sync functions) ---
 _sync_engine = None
 _SyncSessionLocal = None
+
 
 def _sync_normalize_url(url: str) -> str:
     if url.startswith("sqlite+aiosqlite://"):
@@ -214,6 +236,7 @@ def _sync_normalize_url(url: str) -> str:
         return url.replace("postgresql+psycopg://", "postgresql://", 1)
     return url
 
+
 def get_sync_engine():
     global _sync_engine
     if _sync_engine is not None:
@@ -223,14 +246,18 @@ def get_sync_engine():
     url = _sync_normalize_url(get_database_url() or "")  # type: ignore
     try:
         from sqlalchemy import create_engine
+
         if "sqlite" in url:
-            _sync_engine = create_engine(url, echo=False, future=True, connect_args={"check_same_thread": False})
+            _sync_engine = create_engine(
+                url, echo=False, future=True, connect_args={"check_same_thread": False}
+            )
         else:
             _sync_engine = create_engine(url, echo=False, future=True, pool_pre_ping=True)
         return _sync_engine
     except Exception as e:
         logger.warning(f"Failed to create sync engine for {url}: {e}")
         return None
+
 
 def get_sync_sessionmaker():
     global _SyncSessionLocal
@@ -241,11 +268,13 @@ def get_sync_sessionmaker():
         return None
     try:
         from sqlalchemy.orm import sessionmaker
+
         _SyncSessionLocal = sessionmaker(eng, expire_on_commit=False)
         return _SyncSessionLocal
     except Exception as e:
         logger.warning(f"Failed to create sync sessionmaker: {e}")
         return None
+
 
 def init_db_sync():
     """Sync version for storage fallback — creates tables if DATABASE_URL set."""

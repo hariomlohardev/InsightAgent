@@ -1,4 +1,5 @@
 """Level 10 — Performance tests (5 new, total 150+)."""
+
 import os
 import time
 import tempfile
@@ -8,16 +9,19 @@ import pytest
 from fastapi.testclient import TestClient
 from app.main import app
 
+
 # Ensure isolation from level09 DB (which sets DATABASE_URL to sqlite file)
 @pytest.fixture(autouse=True)
 def _reset_db_and_cache():
     import os as _os
+
     orig = _os.getenv("DATABASE_URL")
     # For perf tests, force filesystem fallback (DB not needed) unless test explicitly sets USE_POLARS
     # Clear DATABASE_URL and reset db engines
     _os.environ.pop("DATABASE_URL", None)
     try:
         import app.core.db as db
+
         db._engine = None
         db._SessionLocal = None
         db._sync_engine = None
@@ -26,6 +30,7 @@ def _reset_db_and_cache():
         pass
     try:
         from app.core.cache import _memory_cache, _memory_times
+
         _memory_cache.clear()
         _memory_times.clear()
     except:
@@ -38,6 +43,7 @@ def _reset_db_and_cache():
         _os.environ.pop("DATABASE_URL", None)
     try:
         import app.core.db as db2
+
         db2._engine = None
         db2._SessionLocal = None
         db2._sync_engine = None
@@ -46,12 +52,15 @@ def _reset_db_and_cache():
         pass
     try:
         from app.core.cache import _memory_cache, _memory_times
+
         _memory_cache.clear()
         _memory_times.clear()
     except:
         pass
 
+
 client = TestClient(app)
+
 
 def _upload_df(df: pd.DataFrame, name: str = "perf.csv"):
     with tempfile.NamedTemporaryFile(suffix=".csv", delete=False, mode="w") as tmp:
@@ -62,6 +71,7 @@ def _upload_df(df: pd.DataFrame, name: str = "perf.csv"):
     p.unlink(missing_ok=True)
     assert r.status_code == 200, r.text
     return r.json()["id"]
+
 
 def test_cache_hit_lt_10ms():
     """Cache hit <10ms via X-Cache header and direct cache hit."""
@@ -82,6 +92,7 @@ def test_cache_hit_lt_10ms():
     # create a version via applying a clean op
     client.delete(f"/api/datasets/{did}")
 
+
 def test_search_q_filter():
     """GET /api/datasets?q= filters by filename."""
     df = pd.DataFrame({"x": [1]})
@@ -99,6 +110,7 @@ def test_search_q_filter():
     client.delete(f"/api/datasets/{did1}")
     client.delete(f"/api/datasets/{did2}")
 
+
 def test_upload_streaming_large():
     """Streaming upload handles large file (simulated 5MB) without OOM — chunked path."""
     # Simulate 5MB CSV (not 100MB to keep CI fast, but exercises streaming code)
@@ -111,9 +123,11 @@ def test_upload_streaming_large():
     assert r.json()["dataset"]["rows"] == rows
     client.delete(f"/api/datasets/{did}")
 
+
 def test_polars_read_path():
     """USE_POLARS=true path works via scan_csv fallback."""
     import os
+
     df = pd.DataFrame({"a": [1, 2], "b": [3, 4]})
     did = _upload_df(df, "polars.csv")
     # Force polars path via env
@@ -121,6 +135,7 @@ def test_polars_read_path():
     os.environ["USE_POLARS"] = "true"
     try:
         from app.core.storage import load_dataset_df
+
         df2 = load_dataset_df(did, use_polars=True)
         assert len(df2) == 2
         assert list(df2.columns) == ["a", "b"]
@@ -134,6 +149,7 @@ def test_polars_read_path():
             os.environ["USE_POLARS"] = old
     client.delete(f"/api/datasets/{did}")
 
+
 def test_profile_cache_version_invalidation():
     """Profile cache key includes version — new version recomputes."""
     df = pd.DataFrame({"a": [1, 2]})
@@ -144,6 +160,7 @@ def test_profile_cache_version_invalidation():
     assert r2.headers.get("X-Cache") == "HIT"
     # Simulate version bump via creating a version
     from app.core.storage import create_version
+
     df2 = pd.DataFrame({"a": [1, 2, 3]})  # noqa: reuses top-level pd
     create_version(did, df2, op="test", prompt="add row", code="df")
     # Next get should be MISS for new version

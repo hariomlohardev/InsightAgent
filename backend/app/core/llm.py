@@ -34,12 +34,14 @@ from app.config import settings
 # Optional imports — gracefully handle missing SDKs
 try:
     from openai import AsyncOpenAI  # type: ignore
+
     _HAS_OPENAI = True
 except ImportError:
     _HAS_OPENAI = False
 
 try:
     import httpx  # type: ignore
+
     _HAS_HTTPX = True
 except ImportError:
     _HAS_HTTPX = False
@@ -53,6 +55,7 @@ PROVIDER_DEFAULTS = {
     "ollama": "llama3.1:8b",
 }
 
+
 def _is_dummy_key(key: Optional[str]) -> bool:
     if not key:
         return True
@@ -64,23 +67,39 @@ def _is_dummy_key(key: Optional[str]) -> bool:
         return True
     return False
 
+
 def _get_env(name: str, default: Optional[str] = None) -> Optional[str]:
-    val = os.getenv(name, getattr(settings, name.lower(), None) if hasattr(settings, name.lower()) else None) or default
+    val = (
+        os.getenv(
+            name, getattr(settings, name.lower(), None) if hasattr(settings, name.lower()) else None
+        )
+        or default
+    )
     if _is_dummy_key(val):
         return None
     return val
 
+
 class LLMProvider:
     """Base class"""
+
     def __init__(self, model: str):
         self.model = model
         self.provider = "base"
 
-    async def chat(self, system: str, user: str, json_mode: bool = False, temperature: float = 0.2, max_tokens: int = 400) -> str:
+    async def chat(
+        self,
+        system: str,
+        user: str,
+        json_mode: bool = False,
+        temperature: float = 0.2,
+        max_tokens: int = 400,
+    ) -> str:
         raise NotImplementedError
 
     def __repr__(self):
         return f"<{self.provider}:{self.model}>"
+
 
 class OpenAIProvider(LLMProvider):
     def __init__(self, api_key: str, model: str, base_url: Optional[str] = None):
@@ -89,7 +108,14 @@ class OpenAIProvider(LLMProvider):
         self.api_key = api_key
         self.base_url = base_url
 
-    async def chat(self, system: str, user: str, json_mode: bool = False, temperature: float = 0.2, max_tokens: int = 400) -> str:
+    async def chat(
+        self,
+        system: str,
+        user: str,
+        json_mode: bool = False,
+        temperature: float = 0.2,
+        max_tokens: int = 400,
+    ) -> str:
         if _HAS_OPENAI:
             kwargs: Dict[str, Any] = {}
             if self.base_url:
@@ -97,7 +123,10 @@ class OpenAIProvider(LLMProvider):
             client = AsyncOpenAI(api_key=self.api_key, **kwargs)
             req = {
                 "model": self.model,
-                "messages": [{"role": "system", "content": system}, {"role": "user", "content": user}],
+                "messages": [
+                    {"role": "system", "content": system},
+                    {"role": "user", "content": user},
+                ],
                 "temperature": temperature,
                 "max_tokens": max_tokens,
             }
@@ -124,10 +153,12 @@ class OpenAIProvider(LLMProvider):
             data = r.json()
             return data["choices"][0]["message"]["content"]
 
+
 class GroqProvider(OpenAIProvider):
     def __init__(self, api_key: str, model: str):
         super().__init__(api_key, model, base_url="https://api.groq.com/openai/v1")
         self.provider = "groq"
+
 
 class GeminiProvider(LLMProvider):
     def __init__(self, api_key: str, model: str):
@@ -135,13 +166,24 @@ class GeminiProvider(LLMProvider):
         self.provider = "gemini"
         self.api_key = api_key
 
-    async def chat(self, system: str, user: str, json_mode: bool = False, temperature: float = 0.2, max_tokens: int = 400) -> str:
+    async def chat(
+        self,
+        system: str,
+        user: str,
+        json_mode: bool = False,
+        temperature: float = 0.2,
+        max_tokens: int = 400,
+    ) -> str:
         # Try SDK if available
         try:
             import google.generativeai as genai  # type: ignore
+
             genai.configure(api_key=self.api_key)
             model = genai.GenerativeModel(self.model, system_instruction=system)
-            gen_config: Dict[str, Any] = {"temperature": temperature, "max_output_tokens": max_tokens}
+            gen_config: Dict[str, Any] = {
+                "temperature": temperature,
+                "max_output_tokens": max_tokens,
+            }
             if json_mode:
                 gen_config["response_mime_type"] = "application/json"
             resp = await model.generate_content_async(user, generation_config=gen_config)
@@ -182,18 +224,28 @@ class GeminiProvider(LLMProvider):
             except (KeyError, IndexError):
                 return json.dumps(data)
 
+
 class ClaudeProvider(LLMProvider):
     def __init__(self, api_key: str, model: str):
         super().__init__(model)
         self.provider = "claude"
         self.api_key = api_key
 
-    async def chat(self, system: str, user: str, json_mode: bool = False, temperature: float = 0.2, max_tokens: int = 400) -> str:
+    async def chat(
+        self,
+        system: str,
+        user: str,
+        json_mode: bool = False,
+        temperature: float = 0.2,
+        max_tokens: int = 400,
+    ) -> str:
         try:
             import anthropic  # type: ignore
+
             # Try async
             try:
                 from anthropic import AsyncAnthropic  # type: ignore
+
                 client = AsyncAnthropic(api_key=self.api_key)
                 kwargs: Dict[str, Any] = {
                     "model": self.model,
@@ -249,13 +301,21 @@ class ClaudeProvider(LLMProvider):
             except (KeyError, TypeError):
                 return json.dumps(data)
 
+
 class OllamaProvider(LLMProvider):
     def __init__(self, base_url: str, model: str):
         super().__init__(model)
         self.provider = "ollama"
         self.base_url = base_url.rstrip("/")
 
-    async def chat(self, system: str, user: str, json_mode: bool = False, temperature: float = 0.2, max_tokens: int = 400) -> str:
+    async def chat(
+        self,
+        system: str,
+        user: str,
+        json_mode: bool = False,
+        temperature: float = 0.2,
+        max_tokens: int = 400,
+    ) -> str:
         if not _HAS_HTTPX:
             raise RuntimeError("httpx not installed for Ollama")
         # Ollama chat API: POST /api/chat
@@ -278,39 +338,64 @@ class OllamaProvider(LLMProvider):
             r.raise_for_status()
             data = r.json()
             # data like {"message": {"content": "..."}, "done": true}
-            return data.get("message", {}).get("content", "") or data.get("response", "") or json.dumps(data)
+            return (
+                data.get("message", {}).get("content", "")
+                or data.get("response", "")
+                or json.dumps(data)
+            )
+
 
 def _detect_provider() -> Optional[LLMProvider]:
     """Auto-detect first available provider from env."""
     # Use _get_env which filters dummy keys; for ollama only consider explicit env var, not default
     openai_key = _get_env("OPENAI_API_KEY") or _get_env("openai_api_key")
     groq_key = _get_env("GROQ_API_KEY") or _get_env("groq_api_key")
-    gemini_key = _get_env("GOOGLE_API_KEY") or _get_env("GEMINI_API_KEY") or _get_env("google_api_key")
-    claude_key = _get_env("ANTHROPIC_API_KEY") or _get_env("CLAUDE_API_KEY") or _get_env("anthropic_api_key")
+    gemini_key = (
+        _get_env("GOOGLE_API_KEY") or _get_env("GEMINI_API_KEY") or _get_env("google_api_key")
+    )
+    claude_key = (
+        _get_env("ANTHROPIC_API_KEY") or _get_env("CLAUDE_API_KEY") or _get_env("anthropic_api_key")
+    )
     # Only consider Ollama if explicitly set via env var (not default)
     ollama_url_explicit = os.getenv("OLLAMA_URL") or os.getenv("OLLAMA_MODEL")
     ollama_url = _get_env("OLLAMA_URL") if ollama_url_explicit else None
 
     # Also check generic LLM_PROVIDER
-    provider_env = (os.getenv("LLM_PROVIDER") or getattr(settings, "llm_provider", "auto") or "auto").lower()
+    provider_env = (
+        os.getenv("LLM_PROVIDER") or getattr(settings, "llm_provider", "auto") or "auto"
+    ).lower()
 
     # If explicit provider set, use it (even if key missing, will error and fallback)
     if provider_env != "auto":
         if provider_env == "openai" and openai_key:
-            model = os.getenv("OPENAI_MODEL") or os.getenv("LLM_MODEL") or PROVIDER_DEFAULTS["openai"]
+            model = (
+                os.getenv("OPENAI_MODEL") or os.getenv("LLM_MODEL") or PROVIDER_DEFAULTS["openai"]
+            )
             return OpenAIProvider(openai_key, model)
         if provider_env == "groq" and groq_key:
             model = os.getenv("GROQ_MODEL") or os.getenv("LLM_MODEL") or PROVIDER_DEFAULTS["groq"]
             return GroqProvider(groq_key, model)
         if provider_env in ("gemini", "google") and gemini_key:
-            model = os.getenv("GEMINI_MODEL") or os.getenv("GOOGLE_MODEL") or os.getenv("LLM_MODEL") or PROVIDER_DEFAULTS["gemini"]
+            model = (
+                os.getenv("GEMINI_MODEL")
+                or os.getenv("GOOGLE_MODEL")
+                or os.getenv("LLM_MODEL")
+                or PROVIDER_DEFAULTS["gemini"]
+            )
             return GeminiProvider(gemini_key, model)
         if provider_env in ("claude", "anthropic") and claude_key:
-            model = os.getenv("CLAUDE_MODEL") or os.getenv("ANTHROPIC_MODEL") or os.getenv("LLM_MODEL") or PROVIDER_DEFAULTS["claude"]
+            model = (
+                os.getenv("CLAUDE_MODEL")
+                or os.getenv("ANTHROPIC_MODEL")
+                or os.getenv("LLM_MODEL")
+                or PROVIDER_DEFAULTS["claude"]
+            )
             return ClaudeProvider(claude_key, model)
         if provider_env == "ollama":
             url = ollama_url or "http://localhost:11434"
-            model = os.getenv("OLLAMA_MODEL") or os.getenv("LLM_MODEL") or PROVIDER_DEFAULTS["ollama"]
+            model = (
+                os.getenv("OLLAMA_MODEL") or os.getenv("LLM_MODEL") or PROVIDER_DEFAULTS["ollama"]
+            )
             return OllamaProvider(url, model)
         # If explicit but no key, fall through to auto
 
@@ -334,12 +419,18 @@ def _detect_provider() -> Optional[LLMProvider]:
         return OllamaProvider(url, model)
 
     # Explicit ollama provider
-    if (os.getenv("LLM_PROVIDER") == "ollama" or getattr(settings, "llm_provider", "auto") == "ollama"):
+    if (
+        os.getenv("LLM_PROVIDER") == "ollama"
+        or getattr(settings, "llm_provider", "auto") == "ollama"
+    ):
         url = ollama_url or os.getenv("OLLAMA_URL") or "http://localhost:11434"
-        model = os.getenv("OLLAMA_MODEL") or getattr(settings, "ollama_model", PROVIDER_DEFAULTS["ollama"])
+        model = os.getenv("OLLAMA_MODEL") or getattr(
+            settings, "ollama_model", PROVIDER_DEFAULTS["ollama"]
+        )
         return OllamaProvider(url, model)
 
     return None
+
 
 def get_llm() -> Optional[LLMProvider]:
     """Factory — returns provider or None if no key configured."""
@@ -349,12 +440,24 @@ def get_llm() -> Optional[LLMProvider]:
         print(f"LLM detection failed: {e}")
         return None
 
+
 def get_llm_info() -> Dict[str, Any]:
     """For /health and UI: which provider is active."""
     llm = get_llm()
     if not llm:
-        return {"provider": "heuristic", "model": "fallback", "configured": False, "available_providers": _available_providers_list()}
-    return {"provider": llm.provider, "model": llm.model, "configured": True, "available_providers": _available_providers_list()}
+        return {
+            "provider": "heuristic",
+            "model": "fallback",
+            "configured": False,
+            "available_providers": _available_providers_list(),
+        }
+    return {
+        "provider": llm.provider,
+        "model": llm.model,
+        "configured": True,
+        "available_providers": _available_providers_list(),
+    }
+
 
 def _available_providers_list():
     providers = []
@@ -374,6 +477,7 @@ def _available_providers_list():
         providers.append("heuristic (no key)")
     return providers
 
+
 # Helper for JSON extraction (in case LLM wraps JSON in markdown)
 def extract_json(text: str) -> Dict[str, Any]:
     """Extract JSON from LLM output that may contain markdown fences."""
@@ -389,11 +493,11 @@ def extract_json(text: str) -> Dict[str, Any]:
             start = text.find("{")
             end = text.rfind("}")
             if start != -1 and end != -1:
-                text = text[start:end+1]
+                text = text[start : end + 1]
     # If still not JSON, try to find JSON object
     if not text.strip().startswith("{"):
         start = text.find("{")
         end = text.rfind("}")
         if start != -1 and end != -1:
-            text = text[start:end+1]
+            text = text[start : end + 1]
     return json.loads(text)

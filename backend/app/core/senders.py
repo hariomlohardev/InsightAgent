@@ -4,6 +4,7 @@ import io
 from email.message import EmailMessage
 from typing import Optional, List
 
+
 def send_email(to: str, subject: str, body: str, attachments: Optional[List[tuple]] = None) -> dict:
     """
     Send email via SMTP. Env: SMTP_HOST, SMTP_PORT, SMTP_USER, SMTP_PASS, SMTP_FROM
@@ -20,7 +21,12 @@ def send_email(to: str, subject: str, body: str, attachments: Optional[List[tupl
     if not host:
         # No SMTP configured — simulate (for OSS demo / tests that mock)
         # check if we are in a test that expects mock to be called; we still return simulated
-        return {"status": "simulated", "to": to, "subject": subject, "detail": "SMTP_HOST not set — simulated send (configure .env to actually send)"}
+        return {
+            "status": "simulated",
+            "to": to,
+            "subject": subject,
+            "detail": "SMTP_HOST not set — simulated send (configure .env to actually send)",
+        }
     msg = EmailMessage()
     msg["From"] = from_addr
     msg["To"] = to
@@ -29,7 +35,7 @@ def send_email(to: str, subject: str, body: str, attachments: Optional[List[tupl
     # Attachments
     if attachments:
         for fname, data, mtype in attachments:
-            main, sub = (mtype.split("/") if "/" in mtype else ("application","octet-stream"))
+            main, sub = mtype.split("/") if "/" in mtype else ("application", "octet-stream")
             msg.add_attachment(data, maintype=main, subtype=sub, filename=fname)
 
     try:
@@ -53,14 +59,21 @@ def send_email(to: str, subject: str, body: str, attachments: Optional[List[tupl
     except Exception as e:
         return {"status": "error", "to": to, "error": str(e)[:300]}
 
-def send_slack(webhook_url: str, text: str, file_bytes: Optional[bytes] = None, filename: str = "chart.png") -> dict:
+
+def send_slack(
+    webhook_url: str, text: str, file_bytes: Optional[bytes] = None, filename: str = "chart.png"
+) -> dict:
     """Send Slack via incoming webhook URL. If file_bytes provided, we try files.upload via bot token else just text+link."""
     if not webhook_url:
-        return {"status": "simulated", "detail": "SLACK_WEBHOOK_URL not set — simulated (provide webhook in schedule)"}
+        return {
+            "status": "simulated",
+            "detail": "SLACK_WEBHOOK_URL not set — simulated (provide webhook in schedule)",
+        }
     # Incoming webhook simple path
     if "hooks.slack.com" in webhook_url or webhook_url.startswith("http"):
         try:
             import httpx
+
             # If file_bytes, we still send text first; file upload needs bot token not webhook
             # So just send text
             payload = {"text": text}
@@ -69,26 +82,39 @@ def send_slack(webhook_url: str, text: str, file_bytes: Optional[bytes] = None, 
             if r.status_code in (200, 201, 204):
                 return {"status": "sent", "detail": text[:80]}
             else:
-                return {"status": "error", "detail": f"Slack webhook {r.status_code}: {r.text[:200]}"}
+                return {
+                    "status": "error",
+                    "detail": f"Slack webhook {r.status_code}: {r.text[:200]}",
+                }
         except Exception as e:
             # Fallback to requests if httpx fails
             try:
                 import requests
+
                 r = requests.post(webhook_url, json={"text": text}, timeout=10)
-                if r.status_code in (200,201,204):
+                if r.status_code in (200, 201, 204):
                     return {"status": "sent"}
                 return {"status": "error", "detail": r.text[:200]}
             except Exception as e2:
                 return {"status": "error", "detail": str(e2)[:200]}
     return {"status": "error", "detail": "Unsupported webhook URL"}
 
-def send_slack_via_bot(token: str, channel: str, text: str, file_bytes: Optional[bytes] = None) -> dict:
+
+def send_slack_via_bot(
+    token: str, channel: str, text: str, file_bytes: Optional[bytes] = None
+) -> dict:
     """If bot token provided, use chat.postMessage/files.upload"""
     import httpx
+
     headers = {"Authorization": f"Bearer {token}"}
     try:
         # Post message
-        r = httpx.post("https://slack.com/api/chat.postMessage", json={"channel": channel, "text": text}, headers=headers, timeout=10)
+        r = httpx.post(
+            "https://slack.com/api/chat.postMessage",
+            json={"channel": channel, "text": text},
+            headers=headers,
+            timeout=10,
+        )
         j = r.json() if r.status_code == 200 else {}
         if not j.get("ok"):
             return {"status": "error", "detail": str(j)[:300]}
@@ -97,7 +123,18 @@ def send_slack_via_bot(token: str, channel: str, text: str, file_bytes: Optional
             # files.upload is legacy; use files.uploadV2?
             try:
                 import requests
-                r2 = requests.post("https://slack.com/api/files.upload", headers=headers, data={"channels": channel, "initial_comment": text[:200]}, files={"file": (filename, file_bytes, "image/png")} if 'filename' in locals() else {"file": ("chart.png", file_bytes, "image/png")}, timeout=10)
+
+                r2 = requests.post(
+                    "https://slack.com/api/files.upload",
+                    headers=headers,
+                    data={"channels": channel, "initial_comment": text[:200]},
+                    files=(
+                        {"file": (filename, file_bytes, "image/png")}
+                        if "filename" in locals()
+                        else {"file": ("chart.png", file_bytes, "image/png")}
+                    ),
+                    timeout=10,
+                )
             except:
                 pass
         return {"status": "sent", "channel": channel}
