@@ -150,18 +150,21 @@ st.markdown(
 )
 
 
-def _try_get(path: str, timeout: int = 3):
+def _try_get(path: str, timeout: float = 1.0):
     urls = [f"{BACKEND_URL}{path}"]
     # fallbacks for local vs docker: backend:8000 may not resolve outside docker
+    # instant fallback — 0.8s per alt, not 3s, so 4 URLs worst 1+0.8*3=3.4s instead of 12s
     if "backend:8000" in BACKEND_URL:
         urls += [
             f"http://localhost:8000{path}",
             f"http://host.docker.internal:8000{path}",
             f"http://127.0.0.1:8000{path}",
         ]
-    for url in urls:
+    # try primary with full timeout, alts with short timeout for instant fallback
+    for i, url in enumerate(urls):
+        t = timeout if i == 0 else 0.8
         try:
-            r = requests.get(url, timeout=timeout)
+            r = requests.get(url, timeout=t)
             if r.status_code == 200:
                 return r
         except:
@@ -169,18 +172,21 @@ def _try_get(path: str, timeout: int = 3):
     return None
 
 
+@st.cache_data(ttl=10, show_spinner=False)
 def backend_health():
-    r = _try_get("/health", timeout=3)
+    r = _try_get("/health", timeout=1.0)
     return r.json() if r is not None else None
 
 
+@st.cache_data(ttl=10, show_spinner=False)
 def backend_root():
-    r = _try_get("/", timeout=3)
+    r = _try_get("/", timeout=1.0)
     return r.json() if r is not None else None
 
 
+@st.cache_data(ttl=10, show_spinner=False)
 def llm_info():
-    r = _try_get("/api/llm/info", timeout=3)
+    r = _try_get("/api/llm/info", timeout=1.0)
     return r.json() if r is not None else None
 
 
@@ -201,7 +207,8 @@ def _backend_bases():
 def list_datasets():
     for base in _backend_bases():
         try:
-            r = requests.get(f"{base}/api/datasets", timeout=10)
+            # instant: 2s primary, 0.8s alt was handled in _try_get style but list_datasets was 10s
+            r = requests.get(f"{base}/api/datasets", timeout=2)
             if r.status_code == 200:
                 return r.json()
         except:
@@ -228,7 +235,7 @@ def upload_dataset(file):
 def get_dataset_details(dataset_id):
     for base in _backend_bases():
         try:
-            r = requests.get(f"{base}/api/datasets/{dataset_id}", timeout=30)
+            r = requests.get(f"{base}/api/datasets/{dataset_id}", timeout=5)
             if r.status_code == 200:
                 return r.json()
             if r.status_code == 404:
@@ -462,8 +469,10 @@ with col_h2:
     else:
         st.caption("LLM: checking...")
 
+# instant header — health check is cached (10s) and instant (1s), no sleep, no st.stop blocking app
 health = backend_health()
 root = backend_root()
+# llm already fetched above (cached)
 if health:
     prov = llm.get("provider") if llm else "heuristic"
     prov_text = (
@@ -494,28 +503,21 @@ if health:
         if llm:
             st.json(llm)
 else:
+    # instant: no time.sleep(2), no st.stop — show warning but let app render so sidebar/main tabs appear instantly
     st.warning(
-        f"⚠️ Backend not reachable at {BACKEND_URL} — retrying... (will fallback to localhost:8000)"
+        f"⚠️ Backend checking at {BACKEND_URL} — will retry on next interaction (fallback localhost:8000 cached).",
+        icon="⚡",
     )
-    # soft retry once with longer timeout
-    import time
-
-    time.sleep(2)
-    health = backend_health()
-    if health:
-        st.success(f"✅ Backend connected after retry — v{health.get('version','0.1.0')}")
-        st.rerun()
-    else:
+    with st.expander("Backend not reachable — help", expanded=False):
         st.error(
             f"❌ Backend not reachable at {BACKEND_URL} (tried fallback localhost:8000). Check: `docker-compose ps` should show backend healthy, or run locally: `cd backend && uvicorn app.main:app --reload --port 8000` and set BACKEND_URL=http://localhost:8000"
         )
         if st.button("🔄 Retry connection"):
+            st.cache_data.clear()
             st.rerun()
-        # don't hard stop — allow sidebar upload to be tested even if health check flaked, but block main tabs
         st.info(
             "Tip: Your logs show 172.18.0.3:47334 GET / 200 OK — backend IS up at http://backend:8000 inside Docker. If you see this inside Docker, just click Retry. If running frontend locally outside Docker, set BACKEND_URL=http://localhost:8000 in .env or `export BACKEND_URL=http://localhost:8000 && streamlit run frontend/streamlit_app.py`"
         )
-        st.stop()
 
 # Sidebar
 with st.sidebar:
@@ -2364,7 +2366,7 @@ with tabs[8]:
                     )
                 with c2:
                     pdf_url = f"{BACKEND_URL}/api/reports/{rep['id']}/export?format=pdf"
-                    st.link_button("PDF", pdf_url, key=f"rep_pdf_{rep['id']}")
+                    st.link_button("PDF", pdf_url)
                 with c3:
                     if st.button("Delete", key=f"rep_del_{rep['id']}"):
                         try:
