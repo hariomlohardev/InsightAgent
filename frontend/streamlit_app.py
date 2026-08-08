@@ -233,9 +233,10 @@ def upload_dataset(file):
 
 @st.cache_data(ttl=60, show_spinner=False)
 def get_dataset_details(dataset_id):
+    # 15s for details (profile can be 1.38s for 10M, but large/wide CSV may be >5s); health stays 1s for instant
     for base in _backend_bases():
         try:
-            r = requests.get(f"{base}/api/datasets/{dataset_id}", timeout=5)
+            r = requests.get(f"{base}/api/datasets/{dataset_id}", timeout=15)
             if r.status_code == 200:
                 return r.json()
             if r.status_code == 404:
@@ -728,16 +729,31 @@ if not datasets:
             st.error(str(e))
     st.stop()
 
-# Main area - dataset details
+# Main area - dataset details (instant first try 15s cached, then auto 30s retry for slow/wide CSV)
 details = get_dataset_details(dataset_id)
+# auto-retry once with 30s for slow profile (>15s) before showing error — fixes e02d0503 “slow (>5s)” case where 15s still not enough on cold FS/parquet
+if not details or "dataset" not in details:
+    with st.spinner("Retrying dataset details with 30s timeout (slow/wide CSV, cold cache)..."):
+        try:
+            r = requests.get(
+                f"http://backend:8000/api/datasets/{dataset_id}",
+                timeout=30,
+                headers=_auth_headers(),
+            )
+            if r.status_code == 200 and "dataset" in r.json():
+                details = r.json()
+                st.toast("Loaded after 30s retry", icon="✅")
+        except Exception:
+            pass
 if not details or "dataset" not in details:
     st.error(
-        f"Failed to load dataset details for `{dataset_id}` — file may be corrupted or deleted. Tried: {', '.join(_backend_bases())} (backend:8000 is the only valid base inside Docker; localhost/host.docker.internal failures inside container are expected — browser uses host localhost via published port)"
+        f"Failed to load dataset details for `{dataset_id}` — file may be corrupted or deleted. Tried: {', '.join(_backend_bases())} (backend:8000 is inside Docker; localhost/host.docker.internal expected to fail there)"
     )
     st.caption(
-        f"Backend URL: {BACKEND_URL} | Inside frontend container only http://backend:8000 works — localhost/host.docker.internal are expected to fail there. Browser on host hitting http://localhost:8000 with longer timeout working proves backend is up but profile is slow (>5s). Now retrying with 30s timeout. Also try: `docker exec $(docker ps -qf name=frontend) curl -m 15 http://backend:8000/api/datasets/{dataset_id}`"
+        f"Backend URL: {BACKEND_URL} | Inside frontend container only http://backend:8000 works. Browser on host hitting http://localhost:8000 with longer timeout working proves backend is up but profile was >15s. Also try: `docker exec $(docker ps -qf name=frontend) curl -m 15 http://backend:8000/api/datasets/{dataset_id}`"
     )
     if st.button("🔄 Retry dataset"):
+        st.cache_data.clear()
         st.rerun()
     if st.button("📋 Show raw backend response (debug)"):
         for base in _backend_bases():
