@@ -1,0 +1,99 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Start — InsightAgent Docs</title>
+<link href="https://fonts.googleapis.com/css2?family=Archivo+Black&family=JetBrains+Mono:wght@400;700&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet">
+<script src="https://cdn.tailwindcss.com"></script>
+<style>
+:root{--pink:#FF2D6B;--pink-soft:#FFE4EC;--black:#0A0A0A;--paper:#FFFEFB;--yellow:#FFD600}
+body{font-family:"Space Mono",ui-monospace,Menlo,monospace;background:var(--paper);color:var(--black)}
+.display{font-family:"Archivo Black",Impact,sans-serif;line-height:.9;letter-spacing:-.03em;text-transform:uppercase}
+.mono{font-family:"JetBrains Mono",ui-monospace,monospace}
+.brutal{border:3px solid var(--black)} .brutal-sm{border:2.5px solid var(--black)}
+.shadow-hard{box-shadow:6px 6px 0 var(--black)} .shadow-hard-lg{box-shadow:10px 10px 0 var(--black)}
+::selection{background:var(--pink);color:white}
+</style>
+</head>
+<body>
+<div class="w-full bg-[var(--black)] text-white text-xs mono py-2 px-4 flex gap-2"><a href="../index.html" class="underline">← HOME</a><span>·</span><a href="./" class="underline">DOCS</a><span>·</span><span class="bg-[var(--pink)] px-1">01 START</span></div>
+<header class="sticky top-0 z-20 bg-[var(--paper)] border-b-[3px] border-[var(--black)]">
+  <div class="max-w-[1100px] mx-auto px-4 h-[64px] flex items-center justify-between">
+    <a href="../index.html" class="flex items-center gap-3"><span class="w-9 h-9 brutal bg-[var(--pink)] text-white grid place-items-center font-black">IA</span><span class="display">INSIGHTAGENT / START</span></a>
+    <nav class="hidden md:flex gap-2 mono text-xs font-bold">
+      <a href="./start.html" class="brutal-sm bg-[var(--yellow)] px-3 py-2">START</a>
+      <a href="./architecture.html" class="brutal-sm bg-white px-3 py-2">ARCH</a>
+      <a href="./api.html" class="brutal-sm bg-white px-3 py-2">API</a>
+      <a href="./blazing.html" class="brutal-sm bg-white px-3 py-2">BLAZING</a>
+    </nav>
+  </div>
+</header>
+
+<main class="max-w-[1100px] mx-auto px-4 py-8 grid lg:grid-cols-[250px_1fr] gap-6">
+<nav class="hidden lg:block sticky top-[80px] self-start brutal bg-white p-4 shadow-hard mono text-xs">
+  <div class="font-black">ON THIS PAGE</div>
+  <ol class="mt-2 space-y-1 list-decimal pl-5 font-bold">
+    <li><a href="#quick" class="underline decoration-[var(--pink)]">Quick start</a></li>
+    <li><a href="#env" class="underline decoration-[var(--pink)]">Env & LLM</a></li>
+    <li><a href="#first" class="underline decoration-[var(--pink)]">First chart</a></li>
+    <li><a href="#storage" class="underline decoration-[var(--pink)]">Storage</a></li>
+  </ol>
+  <div class="mt-4 brutal-sm bg-[var(--yellow)] p-2 font-bold">Next → <a href="./architecture.html" class="underline">ARCHITECTURE</a></div>
+</nav>
+
+<div class="space-y-6 mono text-sm leading-relaxed">
+  <div class="brutal bg-[var(--yellow)] p-6 shadow-hard-lg">
+    <h1 class="display text-[42px]">01 START</h1>
+    <p class="mt-2 max-w-[60ch]">Get talking to your CSV in 30 seconds. No keys needed — heuristic handles 15+ queries. Add <span class="bg-white brutal-sm px-1">GROQ_API_KEY</span> for smarter.</p>
+  </div>
+
+  <section id="quick" class="brutal bg-white p-5 shadow-hard">
+    <h2 class="display text-xl">QUICK START — DOCKER (RECOMMENDED)</h2>
+    <pre class="mt-3 brutal bg-[var(--black)] text-white p-4 overflow-auto text-xs"><code>cp .env.example .env   # add LLM key (optional)
+docker compose up --build
+# Backend http://localhost:8000/docs
+# Frontend http://localhost:8501</code></pre>
+    <div class="mt-4 grid sm:grid-cols-2 gap-3">
+      <div class="brutal-sm p-3"><div class="font-black">WITHOUT DOCKER</div><pre class="mt-2 bg-[#F5F5F5] p-2 brutal-sm overflow-auto text-xs"><code>cd backend && pip install -r requirements.txt
+uvicorn app.main:app --reload --port 8000
+# new shell
+cd frontend && pip install -r requirements.txt
+streamlit run streamlit_app.py --server.port 8501</code></pre></div>
+      <div class="brutal-sm p-3 bg-[var(--pink-soft)]"><div class="font-black">TRY THESE PROMPTS</div><ul class="mt-2 space-y-1 font-bold text-xs"><li class="brutal-sm bg-white p-1">“Show top 5 products by sales”</li><li class="brutal-sm bg-white p-1">“Sales by Region — bar”</li><li class="brutal-sm bg-white p-1">“Why did sales drop in March?”</li><li class="brutal-sm bg-[var(--black)] text-white p-1">SELECT Region, SUM(Sales) FROM df GROUP BY Region</li></ul></div>
+    </div>
+  </section>
+
+  <section id="env" class="brutal bg-white p-5 shadow-hard">
+    <h2 class="display text-xl">ENV & LLM — AUTO PICKS FIRST KEY</h2>
+    <p class="mt-2">Heuristic stays active with no key. Set any key, <span class="bg-[var(--yellow)] px-1 font-bold">LLM_PROVIDER=auto</span> picks first available.</p>
+    <div class="mt-3 grid sm:grid-cols-2 gap-2 text-xs font-bold">
+      <div class="brutal-sm p-3">OPENAI_API_KEY → gpt-4o-mini</div>
+      <div class="brutal-sm p-3 bg-[var(--pink-soft)]">GROQ_API_KEY=gsk_… → llama-3.1-8b (free, fast)</div>
+      <div class="brutal-sm p-3">GOOGLE_API_KEY → gemini-1.5-flash</div>
+      <div class="brutal-sm p-3">ANTHROPIC_API_KEY → claude-3-5-sonnet</div>
+      <div class="brutal-sm p-3 sm:col-span-2">OLLAMA_URL=http://localhost:11434 → llama3.1:8b (local)</div>
+    </div>
+    <p class="mt-3">Check <span class="bg-[var(--black)] text-white px-1">GET /api/llm/info</span> and <span class="bg-[var(--black)] text-white px-1">GET /health</span> → <code>llm.provider</code>. Tests run with no key.</p>
+  </section>
+
+  <section id="first" class="brutal bg-white p-5 shadow-hard">
+    <h2 class="display text-lg">FIRST CHART</h2>
+    <ol class="mt-2 list-decimal pl-5 space-y-1"><li>Upload <span class="font-bold">sales.csv</span> (or Excel) in sidebar.</li><li>Ask <span class="bg-[var(--yellow)] px-1">“Show top 5 products by sales”</span> — get bar chart + table.</li><li>Pin to dashboard, try <span class="font-bold">forecast / outliers / what-if</span>.</li></ol>
+  </section>
+
+  <section id="storage" class="brutal bg-[#F5F5F5] p-5 shadow-hard">
+    <h2 class="display text-lg">STORAGE — NO DB REQUIRED</h2>
+    <p class="mt-2"><span class="bg-white brutal-sm px-1 font-bold">storage/datasets/{id}/data.csv</span> (+ <span class="bg-[var(--yellow)] px-1">data.parquet</span> when &gt;100k) + <span class="font-bold">meta.json</span>. Filesystem fallback keeps <span class="bg-[var(--black)] text-white px-1">docker compose up</span> working. Optional <span class="font-bold">DATABASE_URL</span> + <span class="font-bold">REDIS_URL</span> upgrade to PG/Redis.</p>
+  </section>
+
+  <div class="flex justify-between mono text-xs font-black">
+    <a href="./" class="brutal-sm px-3 py-2 bg-white">← DOCS HUB</a>
+    <a href="./architecture.html" class="brutal bg-[var(--pink)] text-white px-4 py-2 shadow-hard">NEXT: ARCHITECTURE →</a>
+  </div>
+</div>
+</main>
+<footer class="max-w-[1100px] mx-auto px-4 py-6 mono text-xs font-bold flex justify-between border-t-[3px] border-[var(--black)] mt-8"><span>© 2026 INSIGHTAGENT</span><a href="./architecture.html" class="underline">ARCHITECTURE →</a></footer>
+<div class="h-2 bg-[var(--pink)] border-t-[3px] border-[var(--black)]"></div>
+</body>
+</html>

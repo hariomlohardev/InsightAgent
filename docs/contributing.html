@@ -1,0 +1,79 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Contributing — InsightAgent Docs</title>
+<link href="https://fonts.googleapis.com/css2?family=Archivo+Black&family=JetBrains+Mono:wght@400;700&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet">
+<script src="https://cdn.tailwindcss.com"></script>
+<style>
+:root{--pink:#FF2D6B;--pink-soft:#FFE4EC;--black:#0A0A0A;--paper:#FFFEFB;--yellow:#FFD600}
+body{font-family:"Space Mono",ui-monospace,Menlo,monospace;background:var(--paper);color:var(--black)}
+.display{font-family:"Archivo Black",Impact,sans-serif;line-height:.9;letter-spacing:-.03em;text-transform:uppercase}
+.mono{font-family:"JetBrains Mono",ui-monospace,monospace}
+.brutal{border:3px solid var(--black)} .brutal-sm{border:2.5px solid var(--black)}
+.shadow-hard{box-shadow:6px 6px 0 var(--black)} .shadow-hard-lg{box-shadow:10px 10px 0 var(--black)}
+::selection{background:var(--pink);color:white}
+</style>
+</head>
+<body>
+<div class="w-full bg-[var(--black)] text-white mono text-xs py-2 px-4 flex gap-2"><a href="../index.html" class="underline">← HOME</a><span>·</span><a href="./" class="underline">DOCS</a><span>·</span><span class="bg-[var(--yellow)] text-black px-1">06 CONTRIBUTE</span></div>
+<header class="sticky top-0 z-20 bg-[var(--paper)] border-b-[3px] border-[var(--black)]">
+  <div class="max-w-[1100px] mx-auto px-4 h-[64px] flex items-center justify-between">
+    <a href="../index.html" class="flex items-center gap-3"><span class="w-9 h-9 brutal bg-[var(--pink)] text-white grid place-items-center font-black">IA</span><span class="display">INSIGHTAGENT / CONTRIBUTE</span></a>
+    <nav class="hidden md:flex gap-2 mono text-xs font-bold">
+      <a href="./enterprise.html" class="brutal-sm bg-white px-3 py-2">CLOUD</a>
+      <a href="./contributing.html" class="brutal-sm bg-[var(--yellow)] px-3 py-2">CONTRIB</a>
+      <a href="./benchmarks.html" class="brutal-sm bg-white px-3 py-2">BENCH</a>
+    </nav>
+  </div>
+</header>
+<main class="max-w-[1100px] mx-auto px-4 py-8 space-y-6 mono text-sm">
+  <div class="brutal bg-[var(--black)] text-white p-6 shadow-hard-lg">
+    <h1 class="display text-[42px] text-[var(--yellow)]">06 CONTRIBUTE</h1>
+    <p class="mt-2">One command before PR. CI does the rest — you just review & merge. Welcome bot auto-labels, auto-assigns <span class="bg-[var(--pink)] px-1">hariomlohardev</span>.</p>
+  </div>
+
+  <section class="brutal bg-white p-5 shadow-hard">
+    <h2 class="display text-lg">LOCAL CHECKS — RUN BEFORE PUSH</h2>
+    <pre class="mt-3 brutal bg-[var(--black)] text-white p-4 overflow-auto text-xs"><code>make format && make lint && make test
+# or:
+black backend/ frontend/ scripts/
+ruff check backend/ frontend/ scripts/
+cd backend && pytest -q
+PYTHONPATH=backend python scripts/bench_profile.py --rows 100000 --json --per-col | jq .polars.total_ms</code></pre>
+    <p class="mt-3">All checks must be green locally — same as CI <code>gate</code>.</p>
+  </section>
+
+  <section class="brutal bg-white p-5 shadow-hard">
+    <h2 class="display text-lg">CI — ROBUST, 7 JOBS + GATE</h2>
+    <div class="mt-3 grid sm:grid-cols-2 gap-3 text-xs font-bold">
+      <div class="brutal-sm p-3">01 LINT — black + ruff + mypy + py_compile</div>
+      <div class="brutal-sm p-3">02 BACKEND — matrix 3.10/11/12 + PG + Redis</div>
+      <div class="brutal-sm p-3 bg-[var(--pink-soft)]">03 BENCH — 100k &lt;1s + streaming &lt; scan</div>
+      <div class="brutal-sm p-3">04 FRONTEND — AppTest empty profile (no IndexError)</div>
+      <div class="brutal-sm p-3">05 DOCKER — compose config (3 files)</div>
+      <div class="brutal-sm p-3">06 SECURITY — pip-audit + bandit (soft)</div>
+      <div class="brutal-sm p-3 sm:col-span-2 bg-[var(--yellow)]">07 GATE — required check: lint + backend + bench + frontend + docker must be SUCCESS</div>
+    </div>
+    <p class="mt-3 text-xs">Branch protection: Require <code>gate</code> + 1 review. Concurrency <code>cancel-in-progress: true</code> per ref.</p>
+  </section>
+
+  <section class="brutal bg-[var(--yellow)] p-5 shadow-hard">
+    <h2 class="display text-sm">AUTOMATION FOR CONTRIBUTORS</h2>
+    <ul class="mt-2 space-y-1 text-xs font-bold">
+      <li class="brutal-sm bg-white p-2">Welcome bot comments on first PR — read CONTRIBUTING.md</li>
+      <li class="brutal-sm bg-white p-2">Labeler adds <code>bug / enhancement / docs</code> from paths</li>
+      <li class="brutal-sm bg-white p-2">Auto-assign <code>hariomlohardev</code> as reviewer</li>
+      <li class="brutal-sm bg-white p-2">Contributor needs just ONE green gate check to request review</li>
+    </ul>
+  </section>
+
+  <div class="flex justify-between mono text-xs font-black">
+    <a href="./enterprise.html" class="brutal-sm px-3 py-2 bg-white">← CLOUD</a>
+    <a href="./benchmarks.html" class="brutal bg-[var(--pink)] text-white px-4 py-2 shadow-hard">NEXT: BENCHMARKS →</a>
+  </div>
+</main>
+<footer class="max-w-[1100px] mx-auto px-4 py-6 mono text-xs font-bold flex justify-between border-t-[3px] border-[var(--black)] mt-8"><span>© 2026 INSIGHTAGENT</span><a href="../index.html" class="underline">HOME →</a></footer>
+<div class="h-2 bg-[var(--pink)] border-t-[3px] border-[var(--black)]"></div>
+</body>
+</html>

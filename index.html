@@ -227,129 +227,38 @@ cd frontend && pip install -r requirements.txt && streamlit run streamlit_app.py
   <div class="mt-4 brutal-sm bg-[var(--yellow)] mono text-xs font-bold p-2">REPRODUCE → <span class="bg-[var(--black)] text-white px-1">PYTHONPATH=backend python scripts/bench_profile.py --rows 100000 --json --per-col</span> · <span class="bg-white px-1 brutal-sm">bench_read --json</span> · <span class="bg-white px-1 brutal-sm">curl -i /api/datasets/{id} | grep X-Cache</span> — <a href="https://github.com/hariomlohardev/InsightAgent/blob/main/BENCHMARKS.md" class="underline bg-[var(--black)] text-white px-1">BENCHMARKS.md</a></div>
 </section>
 
-<!-- docs hub -->
+<!-- docs hub — multi-page -->
 <section id="docs" class="max-w-[1200px] mx-auto px-4 md:px-6 py-8 border-t-[3px] border-[var(--black)]">
   <div class="flex items-baseline justify-between gap-4 flex-wrap">
-    <h2 class="display text-[28px]">DOCS</h2>
-    <a href="#fulldocs" class="brutal-sm bg-[var(--black)] text-white px-3 py-2 mono text-xs font-black">JUMP TO FULL DOCS ↓</a>
+    <h2 class="display text-[28px]">DOCS <span class="mono text-xs font-black brutal-sm bg-[var(--yellow)] px-2 py-1 align-middle">7 PAGES → /docs/</span></h2>
+    <a href="docs/" class="brutal-sm bg-[var(--pink)] text-white px-3 py-2 mono text-xs font-black hover:bg-[var(--black)]">OPEN DOCS HUB →</a>
   </div>
-  <p class="mono text-xs mt-2 max-w-[70ch]">Self-host, connect live DBs, run 10M rows blazing. Showcase on Pages; full markdown below + <span class="font-bold">docs/</span>.</p>
+  <p class="mono text-xs mt-2 max-w-[70ch]">Each topic is a separate page for readability — no endless scroll. All pages share brutal pink style + same search. Markdown source stays in <span class="font-bold">docs/*.md</span>.</p>
   <div class="mt-5 grid md:grid-cols-4 gap-3">
-    <a href="#fulldocs-start" class="brutal bg-white p-4 shadow-hard hover:bg-[var(--yellow)] block">
+    <a href="docs/start.html" class="brutal bg-white p-4 shadow-hard hover:bg-[var(--yellow)] block">
       <div class="display text-sm">01 START</div><div class="mono text-xs font-bold mt-1">Install, env, LLM keys, first chart</div><div class="mt-3 mono text-xs font-black">OPEN →</div>
     </a>
-    <a href="#fulldocs-arch" class="brutal bg-white p-4 shadow-hard hover:bg-[var(--pink-soft)] block">
+    <a href="docs/architecture.html" class="brutal bg-white p-4 shadow-hard hover:bg-[var(--pink-soft)] block">
       <div class="display text-sm">02 ARCHITECTURE</div><div class="mono text-xs font-bold mt-1">Planner → Coder → Executor → Explainer</div><div class="mt-3 mono text-xs font-black">OPEN →</div>
     </a>
-    <a href="#fulldocs-api" class="brutal bg-white p-4 shadow-hard hover:bg-[var(--yellow)] block">
+    <a href="docs/api.html" class="brutal bg-white p-4 shadow-hard hover:bg-[var(--yellow)] block">
       <div class="display text-sm">03 API</div><div class="mono text-xs font-bold mt-1">Datasets, chat, dashboards, connectors</div><div class="mt-3 mono text-xs font-black">OPEN →</div>
     </a>
-    <a href="#fulldocs-blazfast" class="brutal bg-[var(--pink)] text-white p-4 shadow-hard block">
+    <a href="docs/blazing.html" class="brutal bg-[var(--pink)] text-white p-4 shadow-hard block">
       <div class="display text-sm">04 BLAZING</div><div class="mono text-xs font-bold mt-1">BF-01…BF-06, BENCHMARKS.json</div><div class="mt-3 mono text-xs font-black">OPEN →</div>
     </a>
   </div>
-  <div class="mt-3 grid grid-cols-2 md:grid-cols-4 gap-3 mono text-xs font-black">
-    <a href="https://github.com/hariomlohardev/InsightAgent/blob/main/CONTRIBUTING.md" class="brutal-sm bg-white p-3 text-center hover:bg-[var(--black)] hover:text-white">CONTRIBUTING</a>
-    <a href="https://github.com/hariomlohardev/InsightAgent/blob/main/docs/CLOUD.md" class="brutal-sm bg-white p-3 text-center hover:bg-[var(--black)] hover:text-white">CLOUD</a>
-    <a href="https://github.com/hariomlohardev/InsightAgent/blob/main/docs/enterprise.md" class="brutal-sm bg-white p-3 text-center hover:bg-[var(--black)] hover:text-white">ENTERPRISE</a>
-    <a href="https://github.com/hariomlohardev/InsightAgent/blob/main/SECURITY.md" class="brutal-sm bg-white p-3 text-center hover:bg-[var(--black)] hover:text-white">SECURITY</a>
+  <div class="mt-3 grid md:grid-cols-4 gap-3">
+    <a href="docs/enterprise.html" class="brutal bg-white p-4 shadow-hard hover:bg-[var(--yellow)] block"><div class="display text-xs">05 ENTERPRISE & CLOUD</div><div class="mono text-xs font-bold mt-1">Auth, S3, workspaces, Stripe</div><div class="mt-2 mono text-xs font-black">OPEN →</div></a>
+    <a href="docs/contributing.html" class="brutal bg-white p-4 shadow-hard hover:bg-[var(--pink-soft)] block"><div class="display text-xs">06 CONTRIBUTE</div><div class="mono text-xs font-bold mt-1">Format · lint · test · gate</div><div class="mt-2 mono text-xs font-black">OPEN →</div></a>
+    <a href="docs/benchmarks.html" class="brutal bg-white p-3 shadow-hard hover:bg-[var(--yellow)] block"><div class="display text-xs">07 BENCHMARKS</div><div class="mono text-xs font-bold mt-1">Reproduce 1M/10M + X-Cache</div><div class="mt-2 mono text-xs font-black">OPEN →</div></a>
+    <a href="https://github.com/hariomlohardev/InsightAgent" class="brutal bg-[var(--black)] text-white p-4 shadow-hard block"><div class="display text-xs">GITHUB</div><div class="mono text-xs font-bold mt-1">Source, issues, PRs</div><div class="mt-2 mono text-xs font-black">OPEN ↗</div></a>
   </div>
-</section>
-
-<!-- full docs -->
-<section id="fulldocs" class="max-w-[1200px] mx-auto px-4 md:px-6 py-8 border-t-[3px] border-[var(--black)]">
-  <h2 class="display text-[24px]">FULL DOCS — EVERYTHING IN ONE PAGE</h2>
-  <p class="mono text-xs mt-2">Complete reference (markdown in <span class="bg-[var(--yellow)] px-1">docs/*.md</span>, <span class="bg-[var(--yellow)] px-1">ARCHITECTURE.md</span>). Docusaurus optional: <span class="brutal-sm px-1">cd docs && npm run build</span>.</p>
-
-  <div class="mt-6 grid lg:grid-cols-[260px_1fr] gap-6">
-    <nav class="hidden lg:block sticky top-[72px] self-start brutal bg-white p-4 shadow-hard mono text-xs">
-      <div class="font-black">ON THIS PAGE</div>
-      <ol class="mt-2 space-y-1 list-decimal pl-5 font-bold">
-        <li><a href="#fulldocs-start" class="underline decoration-[3px] decoration-[var(--pink)]">Start</a></li>
-        <li><a href="#fulldocs-env" class="underline decoration-[3px] decoration-[var(--pink)]">Env & LLM</a></li>
-        <li><a href="#fulldocs-arch" class="underline decoration-[3px] decoration-[var(--pink)]">Architecture</a></li>
-        <li><a href="#fulldocs-api" class="underline decoration-[3px] decoration-[var(--pink)]">API</a></li>
-        <li><a href="#fulldocs-blazfast" class="underline decoration-[3px] decoration-[var(--pink)]">Blazing</a></li>
-        <li><a href="#fulldocs-enterprise" class="underline decoration-[3px] decoration-[var(--pink)]">Enterprise & Cloud</a></li>
-        <li><a href="#fulldocs-contrib" class="underline decoration-[3px] decoration-[var(--pink)]">Contribute</a></li>
-      </ol>
-      <div class="mt-4 brutal-sm bg-[var(--yellow)] p-2 font-bold">Edit in docs/ → PR → CI gate green → merge</div>
-    </nav>
-
-    <div class="mono text-xs leading-relaxed space-y-6">
-      <div class="brutal bg-white p-4 shadow-hard">
-        <h3 id="fulldocs-start" class="display text-lg">1. START</h3>
-        <pre class="mt-3 brutal bg-[var(--black)] text-white p-3 overflow-auto"><code>cp .env.example .env   # add LLM key (optional)
-docker compose up --build
-# Backend http://localhost:8000/docs  Frontend http://localhost:8501
-# Local: cd backend && pip install -r requirements.txt && uvicorn app.main:app --reload
-#        cd frontend && pip install -r requirements.txt && streamlit run streamlit_app.py</code></pre>
-        <p class="mt-3">Storage is <span class="bg-[var(--pink-soft)] px-1 font-bold">storage/datasets/{id}/data.csv</span> (+ <span class="bg-[var(--yellow)] px-1 font-bold">data.parquet</span> when &gt;100k) + <span class="font-bold">meta.json</span>. No DB/Redis required — filesystem fallback keeps <span class="bg-[var(--black)] text-white px-1">docker compose up</span> working.</p>
-      </div>
-
-      <div class="brutal bg-white p-4 shadow-hard">
-        <h3 id="fulldocs-env" class="display text-lg">2. ENV & LLM</h3>
-        <p class="mt-2">Heuristic covers 15+ queries with no key. Set any key, <span class="bg-[var(--yellow)] px-1 font-bold">LLM_PROVIDER=auto</span> picks first:</p>
-        <ul class="mt-2 grid sm:grid-cols-2 gap-2 font-bold">
-          <li class="brutal-sm p-2">OPENAI_API_KEY → gpt-4o-mini</li>
-          <li class="brutal-sm p-2 bg-[var(--pink-soft)]">GROQ_API_KEY=gsk_… → llama-3.1-8b (free)</li>
-          <li class="brutal-sm p-2">GOOGLE_API_KEY → gemini-1.5-flash</li>
-          <li class="brutal-sm p-2">ANTHROPIC_API_KEY → claude-3-5-sonnet</li>
-          <li class="brutal-sm p-2 sm:col-span-2">OLLAMA_URL=http://localhost:11434 → llama3.1:8b</li>
-        </ul>
-        <p class="mt-3">Check <span class="bg-[var(--black)] text-white px-1">GET /api/llm/info</span> and <span class="bg-[var(--black)] text-white px-1">GET /health</span>.</p>
-      </div>
-
-      <div class="brutal bg-white p-4 shadow-hard">
-        <h3 id="fulldocs-arch" class="display text-lg">3. ARCHITECTURE</h3>
-        <pre class="mt-3 brutal bg-[#F5F5F5] p-3 overflow-auto"><code>Streamlit 8501 → FastAPI 8000 → Agent (Planner → Coder → Executor → Explainer)
-                         ↓
-               Pandas + DuckDB + Plotly
-                         ↓
-               FS / DB / S3  +  Cache (Redis/LRU) + profiling
-Frontend LLM badge + Cloud/Market + dashboards + Connect + Analytics + Schedules</code></pre>
-        <p class="mt-3">See <a href="https://github.com/hariomlohardev/InsightAgent/blob/main/ARCHITECTURE.md" class="underline decoration-[3px] decoration-[var(--pink)] font-bold">ARCHITECTURE.md</a> and <span class="font-bold">plans/00_ROADMAP.md</span> (L1→L12). Security: AST <span class="bg-[var(--yellow)] px-1">validate_code</span> blocks <span class="font-bold">os,subprocess,…</span> + <span class="font-bold">__import__</span>, 5s timeout.</p>
-      </div>
-
-      <div class="brutal bg-white p-4 shadow-hard">
-        <h3 id="fulldocs-api" class="display text-lg">4. API</h3>
-        <p class="mt-2">Docs at <span class="bg-[var(--black)] text-white px-1">/docs</span>. Key:</p>
-        <div class="mt-2 grid sm:grid-cols-2 gap-2 mono text-xs font-bold">
-          <span class="brutal-sm p-2">POST /api/datasets/upload</span>
-          <span class="brutal-sm p-2 bg-[var(--pink-soft)]">GET /api/datasets/{id} X-Cache</span>
-          <span class="brutal-sm p-2 bg-[var(--yellow)]">POST /api/chat X-Cache:HIT &lt;5ms</span>
-          <span class="brutal-sm p-2">POST /api/dashboards/{id}/widgets</span>
-          <span class="brutal-sm p-2">POST /api/connectors/{id}/query</span>
-          <span class="brutal-sm p-2">POST /api/datasets/join</span>
-          <span class="brutal-sm p-2">POST /api/schedules</span>
-          <span class="brutal-sm p-2">GET /health</span>
-        </div>
-      </div>
-
-      <div class="brutal bg-[var(--yellow)] p-4 shadow-hard">
-        <h3 id="fulldocs-blazfast" class="display text-lg">5. BLAZING (BF-01…BF-06)</h3>
-        <p class="mt-2 font-bold"><span class="bg-[var(--black)] text-white px-1">plan/blazfast/</span> (7 docs) + <span class="bg-[var(--black)] text-white px-1">BENCHMARKS.json</span> is source of truth.</p>
-        <ul class="mt-3 space-y-2">
-          <li class="brutal-sm bg-white p-2"><span class="bg-[var(--black)] text-white px-1">BF-01 Measure</span> — bench_profile --json --per-col + bench_read + DEBUG_PROFILE</li>
-          <li class="brutal-sm bg-white p-2"><span class="bg-[var(--black)] text-white px-1">BF-02 Hot Path</span> — vectorized isna/nunique, skip value_counts if &gt;1000, scan→streaming 1M 1.79s→1.38s -23%</li>
-          <li class="brutal-sm bg-white p-2"><span class="bg-[var(--black)] text-white px-1">BF-03 Cache</span> — chat:{id}:{qhash}:{version} → X-Cache:HIT 3.5ms (p95 111ms)</li>
-          <li class="brutal-sm bg-white p-2"><span class="bg-[var(--black)] text-white px-1">BF-04 Storage</span> — to_parquet if &gt;100k (200k 48ms vs 205ms)</li>
-          <li class="brutal-sm bg-white p-2"><span class="bg-[var(--black)] text-white px-1">BF-05 Frontend</span> — @st.cache_data + describe 8 keys -33% + 20/page</li>
-          <li class="brutal-sm bg-white p-2"><span class="bg-[var(--black)] text-white px-1">BF-06 Scale</span> — Semaphore(20) + X-Concurrency p95 &lt;150ms</li>
-        </ul>
-        <p class="mt-3 font-bold">Reproduce: <span class="bg-white px-1 brutal-sm">PYTHONPATH=backend python scripts/bench_profile.py --rows 100000 --json --per-col</span></p>
-      </div>
-
-      <div class="brutal bg-white p-4 shadow-hard">
-        <h3 id="fulldocs-enterprise" class="display text-lg">6. ENTERPRISE & CLOUD</h3>
-        <p class="mt-2">OSS stays <span class="bg-[var(--yellow)] px-1 font-bold">AUTH_REQUIRED=false CLOUD=false</span> (anon editor). Flip: <span class="font-bold">AUTH_REQUIRED=true</span> → JWT/API-key, <span class="font-bold">REDIS_URL</span> → cache(60s)/queue(202), <span class="font-bold">USE_POLARS=true</span>, <span class="font-bold">STORAGE_BACKEND=s3</span>. Cloud <span class="font-bold">CLOUD=true</span> → <span class="bg-[var(--pink-soft)] px-1">storage/workspaces/{ws_id}/</span>, Stripe mock, white-label. See <span class="underline decoration-2 decoration-[var(--pink)] font-bold">docs/enterprise.md</span> + <span class="underline decoration-2 decoration-[var(--pink)] font-bold">docs/CLOUD.md</span>.</p>
-      </div>
-
-      <div class="brutal bg-[var(--black)] text-white p-4 shadow-hard">
-        <h3 id="fulldocs-contrib" class="display text-lg text-[var(--yellow)]">7. CONTRIBUTE</h3>
-        <p class="mt-2"><span class="bg-white text-black px-1 font-bold">make format && make lint && make test</span> before PR. CI runs <span class="bg-[var(--pink)] px-1">lint</span> + <span class="bg-[var(--pink)] px-1">backend (3.10/11/12 + PG/Redis)</span> + <span class="bg-[var(--pink)] px-1">bench 100k</span> + <span class="bg-[var(--pink)] px-1">frontend AppTest</span> + <span class="bg-[var(--pink)] px-1">docker config</span> → required <span class="bg-[var(--yellow)] text-black px-1">gate</span>. Welcome bot + auto-label → one review → merge. See <span class="underline decoration-[var(--pink)]">CONTRIBUTING.md</span>.</p>
-      </div>
-    </div>
+  <div class="mt-3 grid grid-cols-2 md:grid-cols-4 gap-3 mono text-xs font-black">
+    <a href="https://github.com/hariomlohardev/InsightAgent/blob/main/CONTRIBUTING.md" class="brutal-sm bg-white p-3 text-center hover:bg-[var(--black)] hover:text-white">CONTRIBUTING.md</a>
+    <a href="https://github.com/hariomlohardev/InsightAgent/blob/main/docs/CLOUD.md" class="brutal-sm bg-white p-3 text-center hover:bg-[var(--black)] hover:text-white">CLOUD.md</a>
+    <a href="https://github.com/hariomlohardev/InsightAgent/blob/main/docs/enterprise.md" class="brutal-sm bg-white p-3 text-center hover:bg-[var(--black)] hover:text-white">enterprise.md</a>
+    <a href="https://github.com/hariomlohardev/InsightAgent/blob/main/SECURITY.md" class="brutal-sm bg-white p-3 text-center hover:bg-[var(--black)] hover:text-white">SECURITY.md</a>
   </div>
 </section>
 

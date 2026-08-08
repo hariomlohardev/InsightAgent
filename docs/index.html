@@ -3,368 +3,113 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>InsightAgent — Chat with your CSV/Excel/SQL</title>
-<meta name="description" content="Open source MIT. Chat with your CSV/Excel/SQL in plain English. Brutal, fast, private.">
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<title>Docs — InsightAgent</title>
+<meta name="description" content="InsightAgent docs hub — 7 brutal pages, pink accent, no endless scroll.">
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Archivo+Black&family=JetBrains+Mono:wght@400;700&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet">
 <script src="https://cdn.tailwindcss.com"></script>
 <style>
-:root{
-  --pink:#FF2D6B;
-  --pink-soft:#FFE4EC;
-  --black:#0A0A0A;
-  --paper:#FFFEFB;
-  --line:#0A0A0A;
-  --yellow:#FFD600;
-}
-*{scrollbar-width:thin}
-html{scroll-behavior:auto}
-body{
-  font-family:"Space Mono",ui-monospace,Menlo,monospace;
-  background:var(--paper);
-  color:var(--black);
-  -webkit-font-smoothing:antialiased;
-}
-.display{font-family:"Archivo Black",Impact, sans-serif; line-height:.9; letter-spacing:-.03em; text-transform:uppercase}
+:root{--pink:#FF2D6B;--pink-soft:#FFE4EC;--black:#0A0A0A;--paper:#FFFEFB;--yellow:#FFD600}
+body{font-family:"Space Mono",ui-monospace,Menlo,monospace;background:var(--paper);color:var(--black)}
+.display{font-family:"Archivo Black",Impact,sans-serif;line-height:.9;letter-spacing:-.03em;text-transform:uppercase}
 .mono{font-family:"JetBrains Mono",ui-monospace,monospace}
-.brutal{border:3px solid var(--black)}
-.brutal-sm{border:2.5px solid var(--black)}
-.shadow-hard{box-shadow:6px 6px 0 var(--black)}
-.shadow-hard-lg{box-shadow:10px 10px 0 var(--black)}
-.shadow-hard-sm{box-shadow:4px 4px 0 var(--black)}
-::selection{background:var(--pink); color:white}
-a:focus-visible{outline:3px solid var(--pink); outline-offset:2px}
-@media (prefers-reduced-motion:reduce){*{animation:none!important; transition:none!important}}
+.brutal{border:3px solid var(--black)} .brutal-sm{border:2.5px solid var(--black)}
+.shadow-hard{box-shadow:6px 6px 0 var(--black)} .shadow-hard-lg{box-shadow:10px 10px 0 var(--black)} .shadow-hard-sm{box-shadow:4px 4px 0 var(--black)}
+::selection{background:var(--pink);color:white}
 </style>
 </head>
-<body class="bg-[var(--paper)] text-[var(--black)]">
-<!-- top ticker -->
-<div class="w-full bg-[var(--black)] text-white text-xs mono overflow-hidden border-b-[3px] border-[var(--black)]">
-  <div class="flex whitespace-nowrap py-2 gap-8 animate-none">
-    <span>● MIT OPEN SOURCE</span><span>● 10M ROWS → 1.38S</span><span>● NO KEYS REQUIRED</span><span>● 156 TESTS GREEN</span><span>● DOCKER COMPOSE UP</span><span>● X-CACHE:HIT 3.5MS</span><span>● MIT OPEN SOURCE</span><span>● 10M ROWS → 1.38S</span><span>● NO KEYS REQUIRED</span>
-  </div>
+<body>
+<div class="w-full bg-[var(--black)] text-white text-xs mono py-2 px-4 flex gap-3">
+  <a href="../index.html" class="underline decoration-[var(--pink)]">← HOME</a> <span>·</span> <span class="bg-[var(--pink)] px-1">DOCS HUB</span> <span>·</span> <span>hariomlohardev.github.io/InsightAgent/docs/</span>
 </div>
-
-<!-- nav -->
 <header class="sticky top-0 z-20 bg-[var(--paper)] border-b-[3px] border-[var(--black)]">
-  <div class="max-w-[1200px] mx-auto px-4 md:px-6 h-[64px] flex items-center justify-between gap-4">
-    <a href="#" class="flex items-center gap-3">
-      <span class="w-10 h-10 brutal bg-[var(--pink)] text-white grid place-items-center font-black text-sm leading-none">IA</span>
-      <span class="display text-[22px] tracking-tight">INSIGHTAGENT</span>
-      <span class="hidden lg:inline-flex brutal-sm bg-[var(--yellow)] px-2 py-1 text-xs font-bold mono">v1 · MIT · 1.38s</span>
-    </a>
-    <nav class="hidden md:flex items-center gap-2 text-xs font-bold mono">
-      <a href="#features" class="brutal-sm px-3 py-2 bg-white hover:bg-[var(--pink-soft)]">FEATURES</a>
-      <a href="#quickstart" class="brutal-sm px-3 py-2 bg-white hover:bg-[var(--pink-soft)]">QUICK START</a>
-      <a href="#docs" class="brutal-sm px-3 py-2 bg-white hover:bg-[var(--pink-soft)]">DOCS</a>
-      <a href="#benchmarks" class="brutal-sm px-3 py-2 bg-white hover:bg-[var(--pink-soft)]">BENCHMARKS</a>
-      <a href="https://github.com/hariomlohardev/InsightAgent" class="brutal bg-[var(--black)] text-white px-4 py-2 hover:bg-[var(--pink)] hover:text-white">GITHUB ↗</a>
+  <div class="max-w-[1100px] mx-auto px-4 md:px-6 h-[64px] flex items-center justify-between">
+    <a href="../index.html" class="flex items-center gap-3"><span class="w-10 h-10 brutal bg-[var(--pink)] text-white grid place-items-center font-black">IA</span><span class="display text-[20px]">INSIGHTAGENT / DOCS</span></a>
+    <nav class="hidden md:flex gap-2 mono text-xs font-bold">
+      <a href="../index.html" class="brutal-sm px-3 py-2 bg-white">HOME</a>
+      <a href="./start.html" class="brutal-sm px-3 py-2 bg-white">START</a>
+      <a href="./api.html" class="brutal-sm px-3 py-2 bg-white">API</a>
+      <a href="./blazing.html" class="brutal-sm bg-[var(--pink)] text-white px-3 py-2">BLAZING</a>
     </nav>
-    <a href="https://github.com/hariomlohardev/InsightAgent" class="md:hidden brutal-sm bg-[var(--black)] text-white px-3 py-2 text-xs font-bold">GITHUB</a>
   </div>
 </header>
 
-<!-- hero -->
-<section class="max-w-[1200px] mx-auto px-4 md:px-6 pt-8 md:pt-10 pb-8">
-  <div class="grid lg:grid-cols-[1.08fr_0.92fr] gap-6 items-start">
-    <!-- left -->
-    <div>
-      <div class="inline-flex items-center gap-2 brutal-sm bg-[var(--yellow)] px-3 py-1.5 mono text-xs font-bold">
-        <span class="w-2 h-2 bg-[var(--black)] rounded-full"></span>
-        OPEN SOURCE ALTERNATIVE TO TABLEAU + CHATGPT CODE INTERPRETER
-      </div>
-      <h1 class="display text-[42px] sm:text-[56px] lg:text-[68px] mt-4">
-        CHAT WITH<br>
-        YOUR <span class="inline-block bg-[var(--pink)] text-white px-2 py-1 shadow-hard-sm -rotate-[1deg]">CSV/EXCEL/SQL</span><br>
-        IN PLAIN ENGLISH.
-      </h1>
-      <p class="mt-4 mono text-sm leading-relaxed max-w-[58ch] border-l-[5px] border-[var(--black)] pl-4">
-        Get <span class="bg-[var(--pink-soft)] px-1 font-bold">Plotly</span> charts, tables + plain-English insights in seconds. 100% private — data stays on your machine (<span class="font-bold">heuristic</span> or local <span class="font-bold">ollama</span>). No SQL needed, but <span class="font-bold">SELECT</span> via DuckDB works.
-      </p>
-      <div class="mt-6 flex flex-wrap gap-3">
-        <a href="#quickstart" class="brutal bg-[var(--black)] text-white px-5 py-3 font-black mono text-sm shadow-hard hover:translate-x-[2px] hover:translate-y-[2px] hover:shadow-[4px_4px_0_var(--black)]">DOCKER COMPOSE UP →</a>
-        <a href="#docs" class="brutal bg-white px-5 py-3 font-bold mono text-sm shadow-hard hover:bg-[var(--yellow)]">READ DOCS</a>
-        <a href="https://github.com/hariomlohardev/InsightAgent" class="brutal-sm bg-white px-5 py-3 font-bold mono text-sm hover:bg-[var(--pink)] hover:text-white">★ STAR ON GITHUB</a>
-      </div>
-      <div class="mt-6 grid grid-cols-3 lg:grid-cols-6 gap-2 mono text-xs font-bold">
-        <span class="brutal-sm bg-white px-2 py-2 text-center">PYTHON 3.10+</span>
-        <span class="brutal-sm bg-white px-2 py-2 text-center">FASTAPI 0.110</span>
-        <span class="brutal-sm bg-white px-2 py-2 text-center">STREAMLIT 1.39</span>
-        <span class="brutal-sm bg-[var(--pink)] text-white px-2 py-2 text-center">MIT</span>
-        <span class="brutal-sm bg-white px-2 py-2 text-center">156 TESTS</span>
-        <span class="brutal-sm bg-[var(--yellow)] px-2 py-2 text-center">10M 1.38S</span>
-      </div>
-      <div class="mt-4 brutal bg-white p-3 mono text-xs leading-relaxed flex gap-3 items-start">
-        <span class="brutal-sm bg-[var(--black)] text-white px-2 py-1 font-bold shrink-0">TRY NO KEY</span>
-        <span><span class="bg-[var(--black)] text-white px-1">docker compose up</span> → <span class="font-bold">“Show top 5 products by sales”</span> — heuristic handles 15+ queries. Add <span class="bg-[var(--pink-soft)] px-1">GROQ_API_KEY</span> for smarter.</span>
-      </div>
-    </div>
-
-    <!-- right: brutal window -->
-    <div class="space-y-4">
-      <div class="brutal bg-white shadow-hard-lg overflow-hidden">
-        <div class="h-9 bg-[var(--black)] text-white flex items-center gap-2 px-3 mono text-xs font-bold">
-          <span class="w-3 h-3 brutal-sm bg-[var(--pink)] rounded-full"></span>
-          <span class="w-3 h-3 brutal-sm bg-[var(--yellow)] rounded-full"></span>
-          <span class="w-3 h-3 brutal-sm bg-white rounded-full"></span>
-          <span class="ml-2 opacity-80">localhost:8501 — STREAMLIT</span>
-          <span class="ml-auto bg-[var(--pink)] text-white px-2 py-1">LIVE</span>
-        </div>
-        <img src="docs/static/img/demo.gif" alt="Demo" class="w-full aspect-[16/10] object-cover bg-[#F3F3F3] border-y-[3px] border-[var(--black)]" onerror="this.style.display='none'; this.nextElementSibling.style.display='grid'">
-        <div class="hidden aspect-[16/10] place-items-center bg-[#F3F3F3] mono text-xs font-bold border-y-[3px] border-[var(--black)]">DEMO.GIF → docs/static/img/demo.gif</div>
-        <div class="grid grid-cols-3 divide-x-[3px] divide-[var(--black)] mono text-xs font-bold">
-          <div class="p-3 bg-[var(--pink-soft)]"><div class="opacity-60">01 UPLOAD</div><div class="display text-sm mt-1">sales.csv 200MB</div></div>
-          <div class="p-3 bg-white"><div class="opacity-60">02 ASK</div><div class="display text-sm mt-1">Why sales drop?</div></div>
-          <div class="p-3 bg-[var(--yellow)]"><div class="opacity-60">03 GET</div><div class="display text-sm mt-1">CHART + INSIGHT</div></div>
-        </div>
-      </div>
-      <div class="brutal bg-[var(--black)] text-white p-3 mono text-xs leading-relaxed">
-        <div class="font-black">PROVIDER = AUTO → PICKS FIRST KEY</div>
-        <div class="mt-1 opacity-80">OPENAI <span class="bg-white text-black px-1">gsk_…</span> · GROQ <span class="bg-white text-black px-1">llama-3.1-8b</span> · GEMINI · CLAUDE · OLLAMA <span class="bg-white text-black px-1">llama3.1:8b</span> · Check <span class="bg-[var(--pink)] px-1">GET /api/llm/info</span></div>
-      </div>
+<section class="max-w-[1100px] mx-auto px-4 md:px-6 pt-8">
+  <div class="brutal bg-[var(--yellow)] p-6 shadow-hard-lg">
+    <h1 class="display text-[44px]">DOCS HUB <span class="brutal-sm bg-[var(--black)] text-white px-2 py-1 mono text-sm align-middle">7 PAGES</span></h1>
+    <p class="mono text-sm mt-3 max-w-[70ch]">No endless scroll. Each topic is a separate brutal pink page — fast, readable, shareable. Markdown source stays in <span class="bg-white brutal-sm px-1">docs/*.md</span> + <span class="bg-white brutal-sm px-1">ARCHITECTURE.md</span>.</p>
+    <div class="mt-4 flex flex-wrap gap-2 mono text-xs font-bold">
+      <span class="brutal-sm bg-white px-2 py-1">SEARCH: ⌘K in Docusaurus</span>
+      <span class="brutal-sm bg-[var(--black)] text-white px-2 py-1">PINK #FF2D6B</span>
+      <span class="brutal-sm bg-white px-2 py-1">BRUTALISM · 3px · 6px HARD SHADOW</span>
     </div>
   </div>
-</section>
 
-<!-- features -->
-<section id="features" class="max-w-[1200px] mx-auto px-4 md:px-6 py-8 border-t-[3px] border-[var(--black)]">
-  <div class="flex flex-wrap items-end justify-between gap-3">
-    <h2 class="display text-[32px]">WHAT IT DOES <span class="inline-block bg-[var(--pink)] text-white px-2 text-[14px] py-1 align-middle mono">6 MODULES</span></h2>
-    <span class="mono text-xs font-bold brutal-sm bg-[var(--yellow)] px-2 py-1">HEURISTIC + LLM · NO IMPORT HACKS</span>
-  </div>
   <div class="mt-6 grid md:grid-cols-3 gap-4">
-    <div class="brutal bg-white p-4 shadow-hard">
-      <div class="flex justify-between items-start"><span class="brutal-sm bg-[var(--black)] text-white px-2 py-1 mono text-xs font-black">01</span><span class="brutal-sm bg-[var(--pink)] text-white px-2 py-1 mono text-xs font-bold">CHAT → CHARTS</span></div>
-      <div class="display text-lg mt-3 leading-none">PLANNER → CODER → EXECUTOR → EXPLAINER</div>
-      <p class="mono text-xs leading-relaxed mt-2">14 templates, no <span class="bg-[var(--pink-soft)] px-1 font-bold">import</span>. AST-secured, 5s timeout. Plotly line / bar / pie / scatter / heatmap / hist.</p>
-    </div>
-    <div class="brutal bg-white p-4 shadow-hard">
-      <div class="flex justify-between items-start"><span class="brutal-sm bg-[var(--black)] text-white px-2 py-1 mono text-xs font-black">02</span><span class="brutal-sm bg-[var(--yellow)] px-2 py-1 mono text-xs font-bold">LIVE CONNECTORS</span></div>
-      <div class="display text-lg mt-3 leading-none">POSTGRES / MYSQL / SQLITE / BIGQUERY / SHEETS</div>
-      <p class="mono text-xs leading-relaxed mt-2">DuckDB <span class="bg-[var(--black)] text-white px-1">JOIN</span> 2–3 datasets. Read-only queries.</p>
-    </div>
-    <div class="brutal bg-white p-4 shadow-hard">
-      <div class="flex justify-between items-start"><span class="brutal-sm bg-[var(--black)] text-white px-2 py-1 mono text-xs font-black">03</span><span class="brutal-sm bg-[var(--pink)] text-white px-2 py-1 mono text-xs font-bold">ANALYTICS</span></div>
-      <div class="display text-lg mt-3 leading-none">WHY / OUTLIERS / SEGMENT / FORECAST</div>
-      <p class="mono text-xs leading-relaxed mt-2"><span class="font-bold">why</span> · <span class="font-bold">outliers</span> · <span class="font-bold">segment</span> · <span class="font-bold">forecast</span> · <span class="font-bold">what-if</span> · <span class="font-bold">correlation</span>.</p>
-    </div>
-    <div class="brutal bg-white p-4 shadow-hard">
-      <div class="flex justify-between items-start"><span class="brutal-sm bg-[var(--black)] text-white px-2 py-1 mono text-xs font-black">04</span><span class="brutal-sm bg-white px-2 py-1 mono text-xs font-bold brutal-sm">WRANGLING</span></div>
-      <div class="display text-lg mt-3 leading-none">PREVIEW → APPLY → UNDO</div>
-      <p class="mono text-xs leading-relaxed mt-2">Versioned, diff shown. Undo any step.</p>
-    </div>
-    <div class="brutal bg-white p-4 shadow-hard">
-      <div class="flex justify-between items-start"><span class="brutal-sm bg-[var(--black)] text-white px-2 py-1 mono text-xs font-black">05</span><span class="brutal-sm bg-[var(--yellow)] px-2 py-1 mono text-xs font-bold">DASHBOARDS</span></div>
-      <div class="display text-lg mt-3 leading-none">PIN GRID + SHARE + EXPORT</div>
-      <p class="mono text-xs leading-relaxed mt-2">Grid, <span class="bg-[var(--pink-soft)] px-1">?share=slug</span> public, JSON / CSV / PDF.</p>
-    </div>
-    <div class="brutal bg-white p-4 shadow-hard">
-      <div class="flex justify-between items-start"><span class="brutal-sm bg-[var(--black)] text-white px-2 py-1 mono text-xs font-black">06</span><span class="brutal-sm bg-[var(--pink)] text-white px-2 py-1 mono text-xs font-bold">AUTOMATION</span></div>
-      <div class="display text-lg mt-3 leading-none">CRON → EMAIL / SLACK PDF</div>
-      <p class="mono text-xs leading-relaxed mt-2">APScheduler cron, Slack <span class="font-bold">/insight</span>, comments, reports.</p>
-    </div>
-  </div>
-</section>
-
-<!-- quickstart -->
-<section id="quickstart" class="max-w-[1200px] mx-auto px-4 md:px-6 py-8">
-  <div class="brutal bg-[var(--black)] text-white p-5 md:p-6 shadow-hard-lg">
-    <div class="flex flex-wrap gap-2 items-center">
-      <h2 class="display text-[28px]">QUICK START — 1 COMMAND</h2>
-      <span class="brutal-sm bg-[var(--pink)] px-2 py-1 mono text-xs font-black">COPY / PASTE</span>
-    </div>
-    <div class="mt-5 grid lg:grid-cols-[1.15fr_0.85fr] gap-4">
-      <div class="brutal bg-[#0F0F0F] p-4 mono text-xs leading-relaxed">
-        <div class="text-[var(--pink)] font-bold">▸ DOCKER (RECOMMENDED)</div>
-        <pre class="mt-2 overflow-auto text-white"><code>cp .env.example .env   # add LLM key (optional)
-docker compose up --build
-# Backend http://localhost:8000/docs
-# Frontend http://localhost:8501</code></pre>
-        <div class="mt-4 text-[var(--yellow)] font-bold">▸ WITHOUT DOCKER</div>
-        <pre class="mt-1 overflow-auto text-white"><code>cd backend && pip install -r requirements.txt && uvicorn app.main:app --reload --port 8000
-cd frontend && pip install -r requirements.txt && streamlit run streamlit_app.py --server.port 8501</code></pre>
-      </div>
-      <div class="brutal bg-white text-[var(--black)] p-4">
-        <div class="display text-base">TRY THESE PROMPTS</div>
-        <ul class="mt-3 mono text-xs space-y-2 font-bold">
-          <li class="brutal-sm bg-[var(--pink-soft)] px-2 py-2">“Show top 5 products by sales”</li>
-          <li class="brutal-sm px-2 py-2">“Sales by Region — bar”</li>
-          <li class="brutal-sm px-2 py-2">“Why did sales drop in March?” <span class="bg-[var(--yellow)] px-1">why</span></li>
-          <li class="brutal-sm px-2 py-2">“forecast Sales for next 3 months”</li>
-          <li class="brutal-sm bg-[var(--black)] text-white px-2 py-2">SELECT Region, SUM(Sales) FROM df GROUP BY Region</li>
-        </ul>
-        <div class="mt-3 mono text-xs">Heuristic works with no key. Add <span class="bg-[var(--yellow)] px-1 font-bold">GROQ_API_KEY</span> (free, fast).</div>
-      </div>
-    </div>
-  </div>
-</section>
-
-<!-- benchmarks -->
-<section id="benchmarks" class="max-w-[1200px] mx-auto px-4 md:px-6 py-8 border-t-[3px] border-[var(--black)]">
-  <h2 class="display text-[28px]">BLAZING — MEASURED, NOT CLAIMED</h2>
-  <p class="mono text-xs mt-2">Source of truth: <span class="brutal-sm px-1 bg-[var(--black)] text-white">BENCHMARKS.json</span> · WSL2 i5-12500H, no GPU. Reproduce below.</p>
-  <div class="mt-5 grid md:grid-cols-3 gap-4">
-    <div class="brutal bg-white p-4 shadow-hard">
-      <div class="mono text-xs font-black">1M PROFILE</div>
-      <div class="display text-3xl mt-1">1.38<span class="text-[18px]">S</span> <span class="bg-[var(--yellow)] px-1 text-sm">-23%</span></div>
-      <div class="mono text-xs font-bold mt-1">was 1.79s · polars <span class="bg-[var(--pink)] text-white px-1">39ms streaming</span> vs 205ms scan</div>
-      <div class="mono text-xs mt-2 opacity-70">pandas 1.61s (&lt;2s) · vectorized isna/nunique</div>
-    </div>
-    <div class="brutal bg-[var(--pink)] text-white p-4 shadow-hard">
-      <div class="mono text-xs font-black">CHAT REPEAT</div>
-      <div class="display text-3xl mt-1">3.5<span class="text-[18px]">MS</span> <span class="bg-white text-black px-1 text-sm">646×</span></div>
-      <div class="mono text-xs font-bold mt-1">X-Cache:HIT · chat:{id}:{qhash}:{version}</div>
-      <div class="mono text-xs mt-2 opacity-90">p95 111ms for 20 concurrent HIT</div>
-    </div>
-    <div class="brutal bg-white p-4 shadow-hard">
-      <div class="mono text-xs font-black">FRONTEND</div>
-      <div class="display text-3xl mt-1">&lt;500<span class="text-[18px]">MS</span> <span class="bg-[var(--pink-soft)] px-1 text-sm">-33%</span></div>
-      <div class="mono text-xs font-bold mt-1">@st.cache_data 60s · describe 8 keys</div>
-      <div class="mono text-xs mt-2 opacity-70">paginated 20/page → TTI</div>
-    </div>
-  </div>
-  <div class="mt-4 brutal-sm bg-[var(--yellow)] mono text-xs font-bold p-2">REPRODUCE → <span class="bg-[var(--black)] text-white px-1">PYTHONPATH=backend python scripts/bench_profile.py --rows 100000 --json --per-col</span> · <span class="bg-white px-1 brutal-sm">bench_read --json</span> · <span class="bg-white px-1 brutal-sm">curl -i /api/datasets/{id} | grep X-Cache</span> — <a href="https://github.com/hariomlohardev/InsightAgent/blob/main/BENCHMARKS.md" class="underline bg-[var(--black)] text-white px-1">BENCHMARKS.md</a></div>
-</section>
-
-<!-- docs hub -->
-<section id="docs" class="max-w-[1200px] mx-auto px-4 md:px-6 py-8 border-t-[3px] border-[var(--black)]">
-  <div class="flex items-baseline justify-between gap-4 flex-wrap">
-    <h2 class="display text-[28px]">DOCS</h2>
-    <a href="#fulldocs" class="brutal-sm bg-[var(--black)] text-white px-3 py-2 mono text-xs font-black">JUMP TO FULL DOCS ↓</a>
-  </div>
-  <p class="mono text-xs mt-2 max-w-[70ch]">Self-host, connect live DBs, run 10M rows blazing. Showcase on Pages; full markdown below + <span class="font-bold">docs/</span>.</p>
-  <div class="mt-5 grid md:grid-cols-4 gap-3">
-    <a href="#fulldocs-start" class="brutal bg-white p-4 shadow-hard hover:bg-[var(--yellow)] block">
-      <div class="display text-sm">01 START</div><div class="mono text-xs font-bold mt-1">Install, env, LLM keys, first chart</div><div class="mt-3 mono text-xs font-black">OPEN →</div>
+    <a href="./start.html" class="brutal bg-white p-5 shadow-hard hover:bg-[var(--yellow)] block">
+      <div class="mono text-xs font-black brutal-sm bg-[var(--black)] text-white inline-block px-2 py-1">01</div>
+      <div class="display text-xl mt-3">START</div>
+      <p class="mono text-xs mt-2">Install, <code>.env</code>, LLM keys, first chart. <span class="bg-[var(--pink-soft)] px-1">docker compose up</span> in 30s.</p>
+      <div class="mt-4 mono text-xs font-black">OPEN →</div>
     </a>
-    <a href="#fulldocs-arch" class="brutal bg-white p-4 shadow-hard hover:bg-[var(--pink-soft)] block">
-      <div class="display text-sm">02 ARCHITECTURE</div><div class="mono text-xs font-bold mt-1">Planner → Coder → Executor → Explainer</div><div class="mt-3 mono text-xs font-black">OPEN →</div>
+    <a href="./architecture.html" class="brutal bg-white p-5 shadow-hard hover:bg-[var(--pink-soft)] block">
+      <div class="mono text-xs font-black brutal-sm bg-[var(--black)] text-white inline-block px-2 py-1">02</div>
+      <div class="display text-xl mt-3">ARCHITECTURE</div>
+      <p class="mono text-xs mt-2">Planner → Coder → Executor → Explainer. FS/DB/S3, DuckDB, AST guard.</p>
+      <div class="mt-4 mono text-xs font-black">OPEN →</div>
     </a>
-    <a href="#fulldocs-api" class="brutal bg-white p-4 shadow-hard hover:bg-[var(--yellow)] block">
-      <div class="display text-sm">03 API</div><div class="mono text-xs font-bold mt-1">Datasets, chat, dashboards, connectors</div><div class="mt-3 mono text-xs font-black">OPEN →</div>
+    <a href="./api.html" class="brutal bg-white p-5 shadow-hard hover:bg-[var(--yellow)] block">
+      <div class="mono text-xs font-black brutal-sm bg-[var(--black)] text-white inline-block px-2 py-1">03</div>
+      <div class="display text-xl mt-3">API</div>
+      <p class="mono text-xs mt-2">Datasets, chat <code>X-Cache</code>, dashboards, connectors, join, schedules.</p>
+      <div class="mt-4 mono text-xs font-black">OPEN →</div>
     </a>
-    <a href="#fulldocs-blazfast" class="brutal bg-[var(--pink)] text-white p-4 shadow-hard block">
-      <div class="display text-sm">04 BLAZING</div><div class="mono text-xs font-bold mt-1">BF-01…BF-06, BENCHMARKS.json</div><div class="mt-3 mono text-xs font-black">OPEN →</div>
+    <a href="./blazing.html" class="brutal bg-[var(--pink)] text-white p-5 shadow-hard block">
+      <div class="mono text-xs font-black brutal-sm bg-white text-black inline-block px-2 py-1">04</div>
+      <div class="display text-xl mt-3">BLAZING</div>
+      <p class="mono text-xs mt-2">BF-01…BF-06, <code>BENCHMARKS.json</code> source of truth. 1.38s, 3.5ms HIT.</p>
+      <div class="mt-4 mono text-xs font-black">OPEN →</div>
+    </a>
+    <a href="./enterprise.html" class="brutal bg-white p-5 shadow-hard hover:bg-[var(--yellow)] block">
+      <div class="mono text-xs font-black brutal-sm bg-[var(--black)] text-white inline-block px-2 py-1">05</div>
+      <div class="display text-xl mt-3">ENTERPRISE & CLOUD</div>
+      <p class="mono text-xs mt-2">Auth, S3, workspaces, Stripe, white-label. <code>AUTH_REQUIRED / CLOUD</code> flags.</p>
+      <div class="mt-4 mono text-xs font-black">OPEN →</div>
+    </a>
+    <a href="./contributing.html" class="brutal bg-white p-5 shadow-hard hover:bg-[var(--pink-soft)] block">
+      <div class="mono text-xs font-black brutal-sm bg-[var(--black)] text-white inline-block px-2 py-1">06</div>
+      <div class="display text-xl mt-3">CONTRIBUTE</div>
+      <p class="mono text-xs mt-2">format · lint · test · bench · gate. One review → merge.</p>
+      <div class="mt-4 mono text-xs font-black">OPEN →</div>
+    </a>
+    <a href="./benchmarks.html" class="brutal bg-white p-5 shadow-hard hover:bg-[var(--yellow)] block">
+      <div class="mono text-xs font-black brutal-sm bg-[var(--black)] text-white inline-block px-2 py-1">07</div>
+      <div class="display text-xl mt-3">BENCHMARKS</div>
+      <p class="mono text-xs mt-2">Reproduce 1M/10M, <code>bench_profile --json</code>, <code>X-Cache</code> checks.</p>
+      <div class="mt-4 mono text-xs font-black">OPEN →</div>
+    </a>
+    <a href="https://github.com/hariomlohardev/InsightAgent" class="brutal bg-[var(--black)] text-white p-5 shadow-hard block">
+      <div class="mono text-xs font-black brutal-sm bg-[var(--yellow)] text-black inline-block px-2 py-1">↗</div>
+      <div class="display text-xl mt-3">GITHUB</div>
+      <p class="mono text-xs mt-2">Source, issues, PRs, CI gate. MIT.</p>
+      <div class="mt-4 mono text-xs font-black">OPEN ↗</div>
     </a>
   </div>
-  <div class="mt-3 grid grid-cols-2 md:grid-cols-4 gap-3 mono text-xs font-black">
-    <a href="https://github.com/hariomlohardev/InsightAgent/blob/main/CONTRIBUTING.md" class="brutal-sm bg-white p-3 text-center hover:bg-[var(--black)] hover:text-white">CONTRIBUTING</a>
-    <a href="https://github.com/hariomlohardev/InsightAgent/blob/main/docs/CLOUD.md" class="brutal-sm bg-white p-3 text-center hover:bg-[var(--black)] hover:text-white">CLOUD</a>
-    <a href="https://github.com/hariomlohardev/InsightAgent/blob/main/docs/enterprise.md" class="brutal-sm bg-white p-3 text-center hover:bg-[var(--black)] hover:text-white">ENTERPRISE</a>
-    <a href="https://github.com/hariomlohardev/InsightAgent/blob/main/SECURITY.md" class="brutal-sm bg-white p-3 text-center hover:bg-[var(--black)] hover:text-white">SECURITY</a>
-  </div>
-</section>
 
-<!-- full docs -->
-<section id="fulldocs" class="max-w-[1200px] mx-auto px-4 md:px-6 py-8 border-t-[3px] border-[var(--black)]">
-  <h2 class="display text-[24px]">FULL DOCS — EVERYTHING IN ONE PAGE</h2>
-  <p class="mono text-xs mt-2">Complete reference (markdown in <span class="bg-[var(--yellow)] px-1">docs/*.md</span>, <span class="bg-[var(--yellow)] px-1">ARCHITECTURE.md</span>). Docusaurus optional: <span class="brutal-sm px-1">cd docs && npm run build</span>.</p>
-
-  <div class="mt-6 grid lg:grid-cols-[260px_1fr] gap-6">
-    <nav class="hidden lg:block sticky top-[72px] self-start brutal bg-white p-4 shadow-hard mono text-xs">
-      <div class="font-black">ON THIS PAGE</div>
-      <ol class="mt-2 space-y-1 list-decimal pl-5 font-bold">
-        <li><a href="#fulldocs-start" class="underline decoration-[3px] decoration-[var(--pink)]">Start</a></li>
-        <li><a href="#fulldocs-env" class="underline decoration-[3px] decoration-[var(--pink)]">Env & LLM</a></li>
-        <li><a href="#fulldocs-arch" class="underline decoration-[3px] decoration-[var(--pink)]">Architecture</a></li>
-        <li><a href="#fulldocs-api" class="underline decoration-[3px] decoration-[var(--pink)]">API</a></li>
-        <li><a href="#fulldocs-blazfast" class="underline decoration-[3px] decoration-[var(--pink)]">Blazing</a></li>
-        <li><a href="#fulldocs-enterprise" class="underline decoration-[3px] decoration-[var(--pink)]">Enterprise & Cloud</a></li>
-        <li><a href="#fulldocs-contrib" class="underline decoration-[3px] decoration-[var(--pink)]">Contribute</a></li>
-      </ol>
-      <div class="mt-4 brutal-sm bg-[var(--yellow)] p-2 font-bold">Edit in docs/ → PR → CI gate green → merge</div>
-    </nav>
-
-    <div class="mono text-xs leading-relaxed space-y-6">
-      <div class="brutal bg-white p-4 shadow-hard">
-        <h3 id="fulldocs-start" class="display text-lg">1. START</h3>
-        <pre class="mt-3 brutal bg-[var(--black)] text-white p-3 overflow-auto"><code>cp .env.example .env   # add LLM key (optional)
-docker compose up --build
-# Backend http://localhost:8000/docs  Frontend http://localhost:8501
-# Local: cd backend && pip install -r requirements.txt && uvicorn app.main:app --reload
-#        cd frontend && pip install -r requirements.txt && streamlit run streamlit_app.py</code></pre>
-        <p class="mt-3">Storage is <span class="bg-[var(--pink-soft)] px-1 font-bold">storage/datasets/{id}/data.csv</span> (+ <span class="bg-[var(--yellow)] px-1 font-bold">data.parquet</span> when &gt;100k) + <span class="font-bold">meta.json</span>. No DB/Redis required — filesystem fallback keeps <span class="bg-[var(--black)] text-white px-1">docker compose up</span> working.</p>
-      </div>
-
-      <div class="brutal bg-white p-4 shadow-hard">
-        <h3 id="fulldocs-env" class="display text-lg">2. ENV & LLM</h3>
-        <p class="mt-2">Heuristic covers 15+ queries with no key. Set any key, <span class="bg-[var(--yellow)] px-1 font-bold">LLM_PROVIDER=auto</span> picks first:</p>
-        <ul class="mt-2 grid sm:grid-cols-2 gap-2 font-bold">
-          <li class="brutal-sm p-2">OPENAI_API_KEY → gpt-4o-mini</li>
-          <li class="brutal-sm p-2 bg-[var(--pink-soft)]">GROQ_API_KEY=gsk_… → llama-3.1-8b (free)</li>
-          <li class="brutal-sm p-2">GOOGLE_API_KEY → gemini-1.5-flash</li>
-          <li class="brutal-sm p-2">ANTHROPIC_API_KEY → claude-3-5-sonnet</li>
-          <li class="brutal-sm p-2 sm:col-span-2">OLLAMA_URL=http://localhost:11434 → llama3.1:8b</li>
-        </ul>
-        <p class="mt-3">Check <span class="bg-[var(--black)] text-white px-1">GET /api/llm/info</span> and <span class="bg-[var(--black)] text-white px-1">GET /health</span>.</p>
-      </div>
-
-      <div class="brutal bg-white p-4 shadow-hard">
-        <h3 id="fulldocs-arch" class="display text-lg">3. ARCHITECTURE</h3>
-        <pre class="mt-3 brutal bg-[#F5F5F5] p-3 overflow-auto"><code>Streamlit 8501 → FastAPI 8000 → Agent (Planner → Coder → Executor → Explainer)
-                         ↓
-               Pandas + DuckDB + Plotly
-                         ↓
-               FS / DB / S3  +  Cache (Redis/LRU) + profiling
-Frontend LLM badge + Cloud/Market + dashboards + Connect + Analytics + Schedules</code></pre>
-        <p class="mt-3">See <a href="https://github.com/hariomlohardev/InsightAgent/blob/main/ARCHITECTURE.md" class="underline decoration-[3px] decoration-[var(--pink)] font-bold">ARCHITECTURE.md</a> and <span class="font-bold">plans/00_ROADMAP.md</span> (L1→L12). Security: AST <span class="bg-[var(--yellow)] px-1">validate_code</span> blocks <span class="font-bold">os,subprocess,…</span> + <span class="font-bold">__import__</span>, 5s timeout.</p>
-      </div>
-
-      <div class="brutal bg-white p-4 shadow-hard">
-        <h3 id="fulldocs-api" class="display text-lg">4. API</h3>
-        <p class="mt-2">Docs at <span class="bg-[var(--black)] text-white px-1">/docs</span>. Key:</p>
-        <div class="mt-2 grid sm:grid-cols-2 gap-2 mono text-xs font-bold">
-          <span class="brutal-sm p-2">POST /api/datasets/upload</span>
-          <span class="brutal-sm p-2 bg-[var(--pink-soft)]">GET /api/datasets/{id} X-Cache</span>
-          <span class="brutal-sm p-2 bg-[var(--yellow)]">POST /api/chat X-Cache:HIT &lt;5ms</span>
-          <span class="brutal-sm p-2">POST /api/dashboards/{id}/widgets</span>
-          <span class="brutal-sm p-2">POST /api/connectors/{id}/query</span>
-          <span class="brutal-sm p-2">POST /api/datasets/join</span>
-          <span class="brutal-sm p-2">POST /api/schedules</span>
-          <span class="brutal-sm p-2">GET /health</span>
-        </div>
-      </div>
-
-      <div class="brutal bg-[var(--yellow)] p-4 shadow-hard">
-        <h3 id="fulldocs-blazfast" class="display text-lg">5. BLAZING (BF-01…BF-06)</h3>
-        <p class="mt-2 font-bold"><span class="bg-[var(--black)] text-white px-1">plan/blazfast/</span> (7 docs) + <span class="bg-[var(--black)] text-white px-1">BENCHMARKS.json</span> is source of truth.</p>
-        <ul class="mt-3 space-y-2">
-          <li class="brutal-sm bg-white p-2"><span class="bg-[var(--black)] text-white px-1">BF-01 Measure</span> — bench_profile --json --per-col + bench_read + DEBUG_PROFILE</li>
-          <li class="brutal-sm bg-white p-2"><span class="bg-[var(--black)] text-white px-1">BF-02 Hot Path</span> — vectorized isna/nunique, skip value_counts if &gt;1000, scan→streaming 1M 1.79s→1.38s -23%</li>
-          <li class="brutal-sm bg-white p-2"><span class="bg-[var(--black)] text-white px-1">BF-03 Cache</span> — chat:{id}:{qhash}:{version} → X-Cache:HIT 3.5ms (p95 111ms)</li>
-          <li class="brutal-sm bg-white p-2"><span class="bg-[var(--black)] text-white px-1">BF-04 Storage</span> — to_parquet if &gt;100k (200k 48ms vs 205ms)</li>
-          <li class="brutal-sm bg-white p-2"><span class="bg-[var(--black)] text-white px-1">BF-05 Frontend</span> — @st.cache_data + describe 8 keys -33% + 20/page</li>
-          <li class="brutal-sm bg-white p-2"><span class="bg-[var(--black)] text-white px-1">BF-06 Scale</span> — Semaphore(20) + X-Concurrency p95 &lt;150ms</li>
-        </ul>
-        <p class="mt-3 font-bold">Reproduce: <span class="bg-white px-1 brutal-sm">PYTHONPATH=backend python scripts/bench_profile.py --rows 100000 --json --per-col</span></p>
-      </div>
-
-      <div class="brutal bg-white p-4 shadow-hard">
-        <h3 id="fulldocs-enterprise" class="display text-lg">6. ENTERPRISE & CLOUD</h3>
-        <p class="mt-2">OSS stays <span class="bg-[var(--yellow)] px-1 font-bold">AUTH_REQUIRED=false CLOUD=false</span> (anon editor). Flip: <span class="font-bold">AUTH_REQUIRED=true</span> → JWT/API-key, <span class="font-bold">REDIS_URL</span> → cache(60s)/queue(202), <span class="font-bold">USE_POLARS=true</span>, <span class="font-bold">STORAGE_BACKEND=s3</span>. Cloud <span class="font-bold">CLOUD=true</span> → <span class="bg-[var(--pink-soft)] px-1">storage/workspaces/{ws_id}/</span>, Stripe mock, white-label. See <span class="underline decoration-2 decoration-[var(--pink)] font-bold">docs/enterprise.md</span> + <span class="underline decoration-2 decoration-[var(--pink)] font-bold">docs/CLOUD.md</span>.</p>
-      </div>
-
-      <div class="brutal bg-[var(--black)] text-white p-4 shadow-hard">
-        <h3 id="fulldocs-contrib" class="display text-lg text-[var(--yellow)]">7. CONTRIBUTE</h3>
-        <p class="mt-2"><span class="bg-white text-black px-1 font-bold">make format && make lint && make test</span> before PR. CI runs <span class="bg-[var(--pink)] px-1">lint</span> + <span class="bg-[var(--pink)] px-1">backend (3.10/11/12 + PG/Redis)</span> + <span class="bg-[var(--pink)] px-1">bench 100k</span> + <span class="bg-[var(--pink)] px-1">frontend AppTest</span> + <span class="bg-[var(--pink)] px-1">docker config</span> → required <span class="bg-[var(--yellow)] text-black px-1">gate</span>. Welcome bot + auto-label → one review → merge. See <span class="underline decoration-[var(--pink)]">CONTRIBUTING.md</span>.</p>
-      </div>
+  <div class="mt-6 brutal bg-white p-4 shadow-hard mono text-xs">
+    <div class="font-black">ALSO: MARKDOWN SOURCE</div>
+    <div class="mt-2 grid sm:grid-cols-3 gap-2">
+      <a class="brutal-sm p-2 hover:bg-[var(--yellow)]" href="https://github.com/hariomlohardev/InsightAgent/blob/main/ARCHITECTURE.md">ARCHITECTURE.md</a>
+      <a class="brutal-sm p-2 hover:bg-[var(--yellow)]" href="https://github.com/hariomlohardev/InsightAgent/blob/main/BENCHMARKS.md">BENCHMARKS.md</a>
+      <a class="brutal-sm p-2 hover:bg-[var(--yellow)]" href="https://github.com/hariomlohardev/InsightAgent/blob/main/CONTRIBUTING.md">CONTRIBUTING.md</a>
     </div>
   </div>
 </section>
 
-<footer class="max-w-[1200px] mx-auto px-4 md:px-6 py-6 border-t-[4px] border-[var(--black)] mono text-xs font-bold flex flex-wrap gap-4 justify-between">
-  <div class="flex gap-2 items-center flex-wrap">
-    <span class="brutal-sm bg-[var(--black)] text-white px-2 py-1">© 2026</span>
-    <span>INSIGHTAGENT — MIT · PYTHON · <a href="https://github.com/hariomlohardev/InsightAgent" class="underline decoration-[3px] decoration-[var(--pink)]">GITHUB</a></span>
-  </div>
-  <div class="flex gap-2">
-    <a href="https://github.com/hariomlohardev/InsightAgent/blob/main/ARCHITECTURE.md" class="brutal-sm px-2 py-1 hover:bg-[var(--yellow)]">ARCHITECTURE</a>
-    <a href="https://github.com/hariomlohardev/InsightAgent/blob/main/BENCHMARKS.md" class="brutal-sm px-2 py-1 hover:bg-[var(--yellow)]">BENCHMARKS</a>
-    <a href="https://github.com/hariomlohardev/InsightAgent/blob/main/CONTRIBUTING.md" class="brutal-sm px-2 py-1 hover:bg-[var(--pink)] hover:text-white">CONTRIBUTING</a>
-  </div>
+<footer class="max-w-[1100px] mx-auto px-4 md:px-6 py-6 mono text-xs font-bold flex justify-between flex-wrap gap-3 border-t-[3px] border-[var(--black)] mt-8">
+  <span><span class="brutal-sm bg-[var(--black)] text-white px-1">DOCS HUB</span> / InsightAgent — MIT</span>
+  <span><a href="../index.html" class="underline decoration-[var(--pink)]">HOME</a> · <a href="./start.html" class="underline">START →</a></span>
 </footer>
-
 <div class="h-2 bg-[var(--pink)] border-t-[3px] border-[var(--black)]"></div>
 </body>
 </html>
