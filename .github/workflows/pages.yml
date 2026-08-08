@@ -1,0 +1,51 @@
+name: Pages — showcase + docs
+on:
+  push:
+    branches: [main, master]
+    paths: [index.html, docs/**, README.md, ARCHITECTURE.md, BENCHMARKS.md]
+  workflow_dispatch:
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+concurrency:
+  group: pages
+  cancel-in-progress: false
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Setup Pages
+        uses: actions/configure-pages@v5
+      - name: Build showcase (already static)
+        run: |
+          ls -lh index.html docs/index.html
+          test -f .nojekyll && echo ".nojekyll ok"
+          test -f docs/.nojekyll && echo "docs/.nojekyll ok"
+          # optional Docusaurus build (soft fail if deps missing)
+          if [ -f docs/package.json ]; then
+            cd docs && npm ci --quiet 2>&1 | head -n 20 || echo "npm ci soft fail"
+            npm run build 2>&1 | head -n 50 || echo "docusaurus build soft fail (static index.html still served)"
+            ls -lh build 2>&1 | head -n 20 || true
+          fi
+          # ensure Pages artifact is the showcase
+          mkdir -p /tmp/pages
+          cp index.html /tmp/pages/index.html
+          cp -r docs /tmp/pages/docs 2>&1 | head -n 20 || true
+          cp .nojekyll /tmp/pages/.nojekyll 2>&1 | head -n 5 || true
+          ls -lh /tmp/pages/ 2>&1 | head -n 20
+      - name: Upload artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: /tmp/pages
+  deploy:
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    runs-on: ubuntu-latest
+    needs: build
+    steps:
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4

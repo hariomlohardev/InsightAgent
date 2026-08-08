@@ -1,0 +1,236 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>InsightAgent — Chat with your CSV/Excel/SQL</title>
+<meta name="description" content="Open source MIT. Chat with your CSV/Excel/SQL in plain English. Get charts & insights in seconds. Private, fast, self-host.">
+<link rel="icon" href="docs/static/img/favicon.ico">
+<script src="https://cdn.tailwindcss.com"></script>
+<style>
+:root{--accent:160 84% 39%;--border:214 32% 91%;--muted:215 16% 47%}
+*{font-feature-settings:"ss01" 1}
+body{font-family:Inter, ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial; color:#0f172a; -webkit-font-smoothing:antialiased}
+a{color:inherit}
+code{font-family:ui-monospace, SFMono-Regular, Menlo, monospace}
+.prose a{text-decoration:underline; text-underline-offset:3px}
+::selection{background:hsl(var(--accent) / .15)}
+</style>
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400&display=swap" rel="stylesheet">
+</head>
+<body class="bg-white">
+<!-- nav -->
+<header class="sticky top-0 z-20 bg-white/80 backdrop-blur border-b" style="border-color:hsl(var(--border))">
+  <div class="max-w-6xl mx-auto px-5 h-14 flex items-center justify-between">
+    <a href="#" class="flex items-center gap-2 font-semibold tracking-tight"> <span class="w-7 h-7 rounded-md grid place-items-center text-white" style="background:hsl(var(--accent))">IA</span> InsightAgent <span class="hidden sm:inline text-xs font-medium px-1.5 py-0.5 rounded border" style="border-color:hsl(var(--border)); color:hsl(var(--muted))">MIT · 1.38s</span></a>
+    <nav class="hidden md:flex items-center gap-5 text-sm">
+      <a href="#features" class="hover:opacity-70">Features</a>
+      <a href="#quickstart" class="hover:opacity-70">Quick start</a>
+      <a href="#docs" class="hover:opacity-70">Docs</a>
+      <a href="#benchmarks" class="hover:opacity-70">Benchmarks</a>
+      <a href="https://github.com/hariomlohardev/InsightAgent" class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md border text-sm" style="border-color:hsl(var(--border))">GitHub →</a>
+    </nav>
+    <a href="https://github.com/hariomlohardev/InsightAgent" class="md:hidden text-sm border rounded-md px-3 py-1.5" style="border-color:hsl(var(--border))">GitHub</a>
+  </div>
+</header>
+
+<!-- hero -->
+<section class="max-w-6xl mx-auto px-5 pt-10 pb-8">
+  <div class="grid lg:grid-cols-[1.1fr_.9fr] gap-8 items-start">
+    <div>
+      <p class="text-xs tracking-widest uppercase" style="color:hsl(var(--muted))">Open source alternative to Tableau + ChatGPT Code Interpreter</p>
+      <h1 class="mt-3 text-4xl sm:text-5xl font-bold tracking-tight leading-tight">Chat with your <span style="color:hsl(var(--accent))">CSV/Excel/SQL</span> in plain English.</h1>
+      <p class="mt-4 text-base leading-relaxed" style="color:hsl(var(--muted))">Get Plotly charts, tables and plain-English insights in seconds. 100% private — data stays on your server (<code>heuristic</code> or local <code>ollama</code>). No SQL/Pandas needed, but <code>SELECT</code> via DuckDB works.</p>
+      <div class="mt-6 flex flex-wrap gap-3">
+        <a href="#quickstart" class="px-4 py-2.5 rounded-md bg-slate-900 text-white text-sm font-medium">Get started — docker compose up</a>
+        <a href="#docs" class="px-4 py-2.5 rounded-md border text-sm font-medium" style="border-color:hsl(var(--border))">Read docs</a>
+        <a href="https://github.com/hariomlohardev/InsightAgent" class="px-4 py-2.5 rounded-md border text-sm" style="border-color:hsl(var(--border))">Star on GitHub</a>
+      </div>
+      <div class="mt-4 flex flex-wrap gap-2 text-xs">
+        <span class="px-2 py-1 rounded border" style="border-color:hsl(var(--border))">Python 3.10+</span>
+        <span class="px-2 py-1 rounded border" style="border-color:hsl(var(--border))">FastAPI 0.110</span>
+        <span class="px-2 py-1 rounded border" style="border-color:hsl(var(--border))">Streamlit 1.39</span>
+        <span class="px-2 py-1 rounded border" style="border-color:hsl(var(--border))">MIT</span>
+        <span class="px-2 py-1 rounded border" style="border-color:hsl(var(--border))">156 tests</span>
+        <span class="px-2 py-1 rounded border" style="border-color:hsl(var(--border))">10M 1.38s</span>
+      </div>
+      <div class="mt-6 rounded-lg border p-3 text-sm bg-slate-50" style="border-color:hsl(var(--border))">
+        <div class="font-medium">Try without a key</div>
+        <code class="text-xs">docker-compose up</code> → <code class="text-xs">Show top 5 products by sales</code> — heuristic handles 15+ queries. Add <code class="text-xs">GROQ_API_KEY</code> for smarter.
+      </div>
+    </div>
+    <div class="space-y-3">
+      <div class="rounded-xl border overflow-hidden" style="border-color:hsl(var(--border))">
+        <div class="h-8 flex items-center gap-1.5 px-3 border-b bg-slate-50" style="border-color:hsl(var(--border))"><span class="w-3 h-3 rounded-full bg-slate-200"></span><span class="w-3 h-3 rounded-full bg-slate-200"></span><span class="w-3 h-3 rounded-full bg-slate-200"></span><span class="ml-2 text-xs" style="color:hsl(var(--muted))">http://localhost:8501</span></div>
+        <img src="docs/static/img/demo.gif" alt="Demo" class="w-full aspect-[16/10] object-cover bg-slate-50" onerror="this.style.display='none'; this.nextElementSibling.style.display='grid'">
+        <div class="hidden aspect-[16/10] place-items-center bg-slate-50 text-sm" style="color:hsl(var(--muted))">Demo GIF at <code>docs/static/img/demo.gif</code></div>
+        <div class="grid grid-cols-3 divide-x text-xs" style="border-color:hsl(var(--border))">
+          <div class="p-3"><div style="color:hsl(var(--muted))">Upload</div><div class="font-medium">sales.csv 200MB</div></div>
+          <div class="p-3"><div style="color:hsl(var(--muted))">Ask</div><div class="font-medium">Why did sales drop?</div></div>
+          <div class="p-3"><div style="color:hsl(var(--muted))">Get</div><div class="font-medium">Chart + insight</div></div>
+        </div>
+      </div>
+      <div class="rounded-lg border p-3 text-xs leading-relaxed" style="border-color:hsl(var(--border))">
+        <div class="font-medium">Providers</div>
+        OpenAI <code>gsk_...</code> · Groq <code>llama-3.1-8b</code> · Gemini · Claude · Ollama <code>llama3.1:8b</code> — <code>LLM_PROVIDER=auto</code> picks first key. Check <code>GET /api/llm/info</code>.
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- features -->
+<section id="features" class="max-w-6xl mx-auto px-5 py-8 border-t" style="border-color:hsl(var(--border))">
+  <h2 class="text-lg font-semibold tracking-tight">What it does</h2>
+  <div class="mt-4 grid md:grid-cols-3 gap-3">
+    <div class="rounded-lg border p-4" style="border-color:hsl(var(--border))"><div class="font-medium">📊 Chat → charts</div><p class="mt-1 text-sm" style="color:hsl(var(--muted))">Planner → Coder (14 templates, no <code>import</code>) → Executor (AST-secured, 5s) → Explainer. Plotly line/bar/pie/scatter/heatmap/hist.</p></div>
+    <div class="rounded-lg border p-4" style="border-color:hsl(var(--border))"><div class="font-medium">🔌 Live connectors</div><p class="mt-1 text-sm" style="color:hsl(var(--muted))">Postgres/MySQL/SQLite/BigQuery/Sheets + DuckDB <code>join</code> on 2–3 datasets.</p></div>
+    <div class="rounded-lg border p-4" style="border-color:hsl(var(--border))"><div class="font-medium">📈 Analytics</div><p class="mt-1 text-sm" style="color:hsl(var(--muted))"><code>why</code> / <code>outliers</code> / <code>segment</code> / <code>forecast</code> / <code>what-if</code> / <code>correlation</code>.</p></div>
+    <div class="rounded-lg border p-4" style="border-color:hsl(var(--border))"><div class="font-medium">🧹 Wrangling</div><p class="mt-1 text-sm" style="color:hsl(var(--muted))">Preview → apply → undo (versioned, diff).</p></div>
+    <div class="rounded-lg border p-4" style="border-color:hsl(var(--border))"><div class="font-medium">📌 Dashboards</div><p class="mt-1 text-sm" style="color:hsl(var(--muted))">Pin grid, <code>?share=slug</code> public, export JSON/CSV/PDF.</p></div>
+    <div class="rounded-lg border p-4" style="border-color:hsl(var(--border))"><div class="font-medium">⏰ Automation</div><p class="mt-1 text-sm" style="color:hsl(var(--muted))">APScheduler cron → Email/Slack PDF, Slack <code>/insight</code>, comments, reports.</p></div>
+  </div>
+</section>
+
+<!-- quickstart -->
+<section id="quickstart" class="max-w-6xl mx-auto px-5 py-8 border-t" style="border-color:hsl(var(--border))">
+  <h2 class="text-lg font-semibold tracking-tight">Quick start — 1 command</h2>
+  <div class="mt-4 grid lg:grid-cols-[1.1fr_.9fr] gap-4">
+    <div class="rounded-lg border p-4 bg-slate-900 text-slate-100" style="border-color:#0f172a">
+      <div class="text-xs" style="color:#94a3b8">Docker (recommended)</div>
+      <pre class="mt-2 text-xs leading-relaxed overflow-auto"><code>cp .env.example .env   # add LLM key (optional)
+docker compose up --build
+# Backend http://localhost:8000/docs
+# Frontend http://localhost:8501</code></pre>
+      <div class="mt-3 text-xs" style="color:#94a3b8">Without Docker</div>
+      <pre class="mt-1 text-xs leading-relaxed overflow-auto"><code>cd backend && pip install -r requirements.txt && uvicorn app.main:app --reload --port 8000
+cd frontend && pip install -r requirements.txt && streamlit run streamlit_app.py --server.port 8501</code></pre>
+    </div>
+    <div class="rounded-lg border p-4" style="border-color:hsl(var(--border))">
+      <div class="font-medium">Try these prompts</div>
+      <ul class="mt-2 text-sm list-disc pl-5 space-y-1" style="color:hsl(var(--muted))">
+        <li><code>Show top 5 products by sales</code></li>
+        <li><code>Sales by Region — bar</code></li>
+        <li><code>Why did sales drop in March?</code> (why)</li>
+        <li><code>forecast Sales for next 3 months</code></li>
+        <li><code>SELECT Region, SUM(Sales) FROM df GROUP BY Region</code> (SQL)</li>
+      </ul>
+      <div class="mt-3 text-xs" style="color:hsl(var(--muted))">Heuristic works with no key. Add <code>GROQ_API_KEY</code> (free, fast) for smarter.</div>
+    </div>
+  </div>
+</section>
+
+<!-- benchmarks -->
+<section id="benchmarks" class="max-w-6xl mx-auto px-5 py-8 border-t" style="border-color:hsl(var(--border))">
+  <h2 class="text-lg font-semibold tracking-tight">Blazing — measured, not claimed</h2>
+  <p class="mt-2 text-sm" style="color:hsl(var(--muted))">Machine-readable <code>BENCHMARKS.json</code> is source of truth. WSL2 i5-12500H, no GPU.</p>
+  <div class="mt-4 grid md:grid-cols-3 gap-3 text-sm">
+    <div class="rounded-lg border p-4" style="border-color:hsl(var(--border))"><div class="font-medium">1M profile</div><div class="mt-1">polars <b>1.38s</b> (was 1.79s, -23%)<br>pandas 1.61s (<2s)</div><div class="mt-2 text-xs" style="color:hsl(var(--muted))">vectorized + streaming 39ms vs 205ms</div></div>
+    <div class="rounded-lg border p-4" style="border-color:hsl(var(--border))"><div class="font-medium">Chat repeat</div><div class="mt-1"><b>3.5ms</b> <code>X-Cache:HIT</code> (was 4.6s, 646×)<br><code>chat:{id}:{qhash}:{version}</code></div><div class="mt-2 text-xs" style="color:hsl(var(--muted))">p95 111ms for 20 concurrent HIT</div></div>
+    <div class="rounded-lg border p-4" style="border-color:hsl(var(--border))"><div class="font-medium">Frontend</div><div class="mt-1"><code>describe</code> -33%<br>paginated 20/page → TTI &lt;500ms</div><div class="mt-2 text-xs" style="color:hsl(var(--muted))">@st.cache_data 60s</div></div>
+  </div>
+  <div class="mt-3 text-xs" style="color:hsl(var(--muted))">How to reproduce: <code>PYTHONPATH=backend python scripts/bench_profile.py --rows 100000 --json --per-col</code> · <code>bench_read --json</code> · <code>curl -i /api/datasets/{id} | grep X-Cache</code> — see <a href="https://github.com/hariomlohardev/InsightAgent/blob/main/BENCHMARKS.md" class="underline">BENCHMARKS.md</a></div>
+</section>
+
+<!-- docs hub -->
+<section id="docs" class="max-w-6xl mx-auto px-5 py-8 border-t" style="border-color:hsl(var(--border))">
+  <div class="flex items-baseline justify-between gap-4">
+    <h2 class="text-lg font-semibold tracking-tight">Docs</h2>
+    <a href="#fulldocs" class="text-sm underline">Jump to full docs ↓</a>
+  </div>
+  <p class="mt-2 text-sm" style="color:hsl(var(--muted))">Everything you need to self-host, connect live DBs, and run blazing on 10M rows. On GitHub Pages this is the showcase; full markdown docs are below and in <code>docs/</code>.</p>
+  <div class="mt-4 grid md:grid-cols-4 gap-3 text-sm">
+    <a href="#fulldocs-start" class="rounded-lg border p-4 hover:bg-slate-50" style="border-color:hsl(var(--border))"><div class="font-medium">🚀 Start</div><div class="mt-1" style="color:hsl(var(--muted))">Install, env, LLM keys, first chart</div><div class="mt-2 text-xs underline">Open</div></a>
+    <a href="#fulldocs-arch" class="rounded-lg border p-4 hover:bg-slate-50" style="border-color:hsl(var(--border))"><div class="font-medium">🏗 Architecture</div><div class="mt-1" style="color:hsl(var(--muted))">Agent: Planner → Coder → Executor → Explainer</div><div class="mt-2 text-xs underline">Open</div></a>
+    <a href="#fulldocs-api" class="rounded-lg border p-4 hover:bg-slate-50" style="border-color:hsl(var(--border))"><div class="font-medium">🔌 API</div><div class="mt-1" style="color:hsl(var(--muted))">Datasets, chat, dashboards, connectors, schedules</div><div class="mt-2 text-xs underline">Open</div></a>
+    <a href="#fulldocs-blazfast" class="rounded-lg border p-4 hover:bg-slate-50" style="border-color:hsl(var(--border))"><div class="font-medium">⚡ Blazing</div><div class="mt-1" style="color:hsl(var(--muted))">BF-01…BF-06, BENCHMARKS.json</div><div class="mt-2 text-xs underline">Open</div></a>
+  </div>
+  <div class="mt-3 grid md:grid-cols-4 gap-3 text-sm">
+    <a href="https://github.com/hariomlohardev/InsightAgent/blob/main/CONTRIBUTING.md" class="rounded-lg border p-3 hover:bg-slate-50 text-center underline" style="border-color:hsl(var(--border))">Contributing</a>
+    <a href="https://github.com/hariomlohardev/InsightAgent/blob/main/docs/CLOUD.md" class="rounded-lg border p-3 hover:bg-slate-50 text-center underline" style="border-color:hsl(var(--border))">Cloud</a>
+    <a href="https://github.com/hariomlohardev/InsightAgent/blob/main/docs/enterprise.md" class="rounded-lg border p-3 hover:bg-slate-50 text-center underline" style="border-color:hsl(var(--border))">Enterprise</a>
+    <a href="https://github.com/hariomlohardev/InsightAgent/blob/main/SECURITY.md" class="rounded-lg border p-3 hover:bg-slate-50 text-center underline" style="border-color:hsl(var(--border))">Security</a>
+  </div>
+</section>
+
+<!-- full docs -->
+<section id="fulldocs" class="max-w-6xl mx-auto px-5 py-8 border-t" style="border-color:hsl(var(--border))">
+  <h2 class="text-lg font-semibold tracking-tight">Full docs — everything in one page</h2>
+  <p class="mt-2 text-sm" style="color:hsl(var(--muted))">This is the complete reference (also available as markdown in <code>docs/*.md</code>, <code>ARCHITECTURE.md</code>, <code>CONTRIBUTING.md</code>). For a Docusaurus site, run <code>cd docs && npm run build</code> → <code>docs/build</code> is also served on Pages (see <code>docs/docusaurus.config.js</code>).</p>
+
+  <div class="mt-6 grid lg:grid-cols-[240px_1fr] gap-6">
+    <nav class="hidden lg:block sticky top-[62px] self-start rounded-lg border p-3 text-sm" style="border-color:hsl(var(--border))">
+      <div class="font-medium">On this page</div>
+      <ol class="mt-2 space-y-1 list-decimal pl-5" style="color:hsl(var(--muted))">
+        <li><a href="#fulldocs-start" class="underline">Start</a></li>
+        <li><a href="#fulldocs-env" class="underline">Env & LLM</a></li>
+        <li><a href="#fulldocs-arch" class="underline">Architecture</a></li>
+        <li><a href="#fulldocs-api" class="underline">API</a></li>
+        <li><a href="#fulldocs-blazfast" class="underline">Blazing</a></li>
+        <li><a href="#fulldocs-enterprise" class="underline">Enterprise & Cloud</a></li>
+        <li><a href="#fulldocs-contrib" class="underline">Contribute</a></li>
+      </ol>
+      <div class="mt-4 text-xs" style="color:hsl(var(--muted))">Edit in <code>docs/</code> → PR → CI <code>gate</code> must be green.</div>
+    </nav>
+    <div class="prose max-w-none prose-sm prose-slate">
+      <h3 id="fulldocs-start">1. Start</h3>
+      <pre class="rounded-lg border p-3 bg-slate-900 text-slate-100 text-xs overflow-auto" style="border-color:#0f172a"><code>cp .env.example .env   # add LLM key (optional)
+docker compose up --build
+# Backend http://localhost:8000/docs  Frontend http://localhost:8501
+# Local: cd backend && pip install -r requirements.txt && uvicorn app.main:app --reload
+#        cd frontend && pip install -r requirements.txt && streamlit run streamlit_app.py</code></pre>
+      <p>Storage is <code>storage/datasets/{id}/data.csv</code> (+ <code>data.parquet</code> when &gt;100k) + <code>meta.json</code>. No DB/Redis required — filesystem fallback keeps <code>docker compose up</code> working.</p>
+
+      <h3 id="fulldocs-env">2. Env & LLM</h3>
+      <p>Heuristic covers 15+ queries with no key. Set any key, <code>LLM_PROVIDER=auto</code> picks first:</p>
+      <ul>
+        <li><code>OPENAI_API_KEY</code> → <code>gpt-4o-mini</code></li>
+        <li><code>GROQ_API_KEY=gsk_...</code> → <code>llama-3.1-8b-instant</code> (free, fast)</li>
+        <li><code>GOOGLE_API_KEY</code> → <code>gemini-1.5-flash</code></li>
+        <li><code>ANTHROPIC_API_KEY</code> → <code>claude-3-5-sonnet</code></li>
+        <li><code>OLLAMA_URL=http://localhost:11434</code> → <code>llama3.1:8b</code></li>
+      </ul>
+      <p>Check <code>GET /api/llm/info</code> and <code>GET /health</code> → <code>llm.provider</code>. Tests run with no key.</p>
+
+      <h3 id="fulldocs-arch">3. Architecture</h3>
+      <pre class="rounded-lg border p-3 bg-slate-50 text-xs overflow-auto" style="border-color:hsl(var(--border))"><code>Streamlit 8501 → FastAPI 8000 → Agent (Planner → Coder → Executor → Explainer)
+                         ↓
+               Pandas + DuckDB + Plotly
+                         ↓
+               FS / DB / S3  +  Cache (Redis/LRU) + profiling
+Frontend LLM badge + Cloud/Market + dashboards + Connect + Analytics + Schedules</code></pre>
+      <p>See <a href="https://github.com/hariomlohardev/InsightAgent/blob/main/ARCHITECTURE.md">ARCHITECTURE.md</a> and <code>plans/00_ROADMAP.md</code> (L1→L12). Security: AST <code>validate_code</code> blocks <code>os,subprocess,...</code> + <code>__import__</code>, 5s timeout.</p>
+
+      <h3 id="fulldocs-api">4. API</h3>
+      <p>Docs at <code>/docs</code>. Key: <code>POST /api/datasets/upload</code> · <code>GET /api/datasets/{id}</code> (<code>X-Cache</code>) · <code>POST /api/chat</code> (<code>X-Cache:HIT</code> &lt;5ms) · <code>POST /api/dashboards/{id}/widgets</code> · <code>POST /api/connectors/{id}/query</code> (read-only) · <code>POST /api/datasets/join</code> · <code>POST /api/schedules</code> · <code>GET /health</code>. Full table in <a href="https://github.com/hariomlohardev/InsightAgent/blob/main/ARCHITECTURE.md#api">ARCHITECTURE.md#API</a>.</p>
+
+      <h3 id="fulldocs-blazfast">5. Blazing (BF-01…BF-06)</h3>
+      <p><code>plan/blazfast/</code> (7 docs) + <code>BENCHMARKS.json</code> (machine) is source of truth.</p>
+      <ul>
+        <li><b>BF-01 Measure</b> — <code>bench_profile --json --per-col</code> + <code>bench_read</code> + <code>DEBUG_PROFILE</code></li>
+        <li><b>BF-02 Hot Path</b> — vectorized <code>isna/nunique</code> once, skip <code>value_counts</code> if <code>unique&gt;1000</code>, skip <code>dup</code> if &gt;1M, <code>scan_parquet</code>→<code>streaming</code> (1M 1.79s→1.38s -23%)</li>
+        <li><b>BF-03 Cache</b> — <code>chat:{id}:{qhash}:{version}</code> → <code>X-Cache:HIT 3.5ms</code> (20 concurrent p95 111ms)</li>
+        <li><b>BF-04 Storage</b> — <code>to_parquet</code> if &gt;100k (200k 48ms vs 205ms)</li>
+        <li><b>BF-05 Frontend</b> — <code>@st.cache_data</code> + <code>describe</code> 8 keys -33% + 20/page</li>
+        <li><b>BF-06 Scale</b> — <code>Semaphore(20)</code> + <code>X-Concurrency</code> (p95 &lt;150ms)</li>
+      </ul>
+      <p>Reproduce: <code>PYTHONPATH=backend python scripts/bench_profile.py --rows 100000 --json --per-col</code> — CI <code>bench</code> job asserts <code>&lt;1s</code> and <code>streaming &lt; scan</code>.</p>
+
+      <h3 id="fulldocs-enterprise">6. Enterprise & Cloud</h3>
+      <p>OSS stays <code>AUTH_REQUIRED=false CLOUD=false</code> (anon editor). Flip: <code>AUTH_REQUIRED=true</code> → JWT/API-key, <code>REDIS_URL</code> → cache(60s)/queue(202), <code>USE_POLARS=true</code>, <code>STORAGE_BACKEND=s3</code>. Cloud <code>CLOUD=true</code> → <code>storage/workspaces/{ws_id}/</code>, Stripe mock, white-label, per-workspace LLM. See <a href="https://github.com/hariomlohardev/InsightAgent/blob/main/docs/enterprise.md">docs/enterprise.md</a> + <a href="https://github.com/hariomlohardev/InsightAgent/blob/main/docs/CLOUD.md">docs/CLOUD.md</a>.</p>
+
+      <h3 id="fulldocs-contrib">7. Contribute</h3>
+      <p><code>make format && make lint && make test</code> before PR. CI runs <code>lint</code> + <code>backend (3.10/11/12 + PG/Redis)</code> + <code>bench 100k</code> + <code>frontend AppTest</code> + <code>docker config</code> → required <code>gate</code>. Welcome bot + auto-label + auto-assign <code>hariomlohardev</code> → one review → merge. See <a href="https://github.com/hariomlohardev/InsightAgent/blob/main/CONTRIBUTING.md">CONTRIBUTING.md</a>.</p>
+    </div>
+  </div>
+</section>
+
+<footer class="max-w-6xl mx-auto px-5 py-8 border-t text-sm flex flex-wrap gap-4 justify-between" style="border-color:hsl(var(--border)); color:hsl(var(--muted))">
+  <div>© 2026 InsightAgent — MIT · Built with Python · <a href="https://github.com/hariomlohardev/InsightAgent" class="underline">GitHub</a></div>
+  <div class="flex gap-3">
+    <a href="https://github.com/hariomlohardev/InsightAgent/blob/main/ARCHITECTURE.md" class="underline">Architecture</a>
+    <a href="https://github.com/hariomlohardev/InsightAgent/blob/main/BENCHMARKS.md" class="underline">Benchmarks</a>
+    <a href="https://github.com/hariomlohardev/InsightAgent/blob/main/docs/CONTRIBUTING.md" class="underline">Contributing</a>
+  </div>
+</footer>
+</body>
+</html>
