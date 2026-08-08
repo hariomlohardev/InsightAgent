@@ -1,0 +1,39 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>404 — InsightAgent</title>
+<link href="https://fonts.googleapis.com/css2?family=Archivo+Black&family=JetBrains+Mono:wght@400;700&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet">
+<script src="https://cdn.tailwindcss.com"></script>
+<style>
+:root{--pink:#FF2D6B;--pink-soft:#FFE4EC;--black:#0A0A0A;--paper:#FFFEFB;--yellow:#FFD600}
+body{font-family:"Space Mono",ui-monospace,Menlo,monospace;background:var(--paper);color:var(--black)}
+.display{font-family:"Archivo Black",Impact,sans-serif;line-height:.9;letter-spacing:-.03em;text-transform:uppercase}
+.mono{font-family:"JetBrains Mono",ui-monospace,monospace}
+.brutal{border:3px solid var(--black)} .shadow-hard{box-shadow:6px 6px 0 var(--black)}
+</style>
+</head>
+<body>
+<header class="border-b-[3px] border-[var(--black)] bg-[var(--paper)] sticky top-0">
+  <div class="max-w-[1100px] mx-auto px-4 h-[64px] flex items-center justify-between">
+    <a href="./index.html" class="flex items-center gap-3"><span class="w-9 h-9 brutal bg-[var(--pink)] text-white grid place-items-center font-black">IA</span><span class="display">INSIGHTAGENT</span></a>
+    <a href="./index.html" class="brutal bg-[var(--black)] text-white px-4 py-2 mono text-xs font-black">HOME →</a>
+  </div>
+</header>
+<main class="max-w-[1100px] mx-auto px-4 py-16">
+  <div class="brutal bg-[var(--yellow)] p-8 shadow-hard max-w-[700px]">
+    <div class="display text-[72px] leading-none">404</div>
+    <div class="display text-[28px] mt-2">PAGE NOT FOUND</div>
+    <p class="mono text-sm mt-3">You tried <code id="path" class="brutal bg-white px-1"></code> — that page lives under <code class="bg-[var(--black)] text-white px-1">/docs/</code></p>
+    <div class="mt-6 grid sm:grid-cols-2 gap-3 mono text-xs font-bold">
+      <a href="./docs/" class="brutal bg-white p-3 hover:bg-[var(--pink)] hover:text-white">DOCS HUB →</a>
+      <a href="./docs/benchmarks.html" class="brutal bg-white p-3 hover:bg-[var(--yellow)]">BENCHMARKS →</a>
+      <a href="./docs/start.html" class="brutal bg-white p-3">START →</a>
+      <a href="./docs/blazing.html" class="brutal bg-[var(--pink)] text-white p-3">BLAZING →</a>
+    </div>
+    <p class="mono text-xs mt-4">Correct URL: <code class="bg-white brutal px-1">hariomlohardev.github.io/InsightAgent/docs/benchmarks.html</code> — also works at <code class="bg-white brutal px-1">/benchmarks.html</code> via redirect.</p>
+  </div>
+</main>
+<script>document.getElementById('path').textContent = location.pathname;</script>
+</body>
+</html>

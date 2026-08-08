@@ -32,12 +32,15 @@ jobs:
             npm run build 2>&1 | head -n 50 || echo "docusaurus build soft fail (static index.html still served)"
             ls -lh build 2>&1 | head -n 20 || true
           fi
-          # ensure Pages artifact is the showcase
+          # ensure Pages artifact is the showcase (multi-page + redirects)
           mkdir -p /tmp/pages
           cp index.html /tmp/pages/index.html
+          # root redirects so /benchmarks.html works as well as /docs/benchmarks.html
+          for f in 404.html benchmarks.html blazing.html start.html architecture.html api.html enterprise.html contributing.html; do test -f "$f" && cp "$f" /tmp/pages/"$f" 2>&1 | head -n 5 || true; done
           cp -r docs /tmp/pages/docs 2>&1 | head -n 20 || true
           cp .nojekyll /tmp/pages/.nojekyll 2>&1 | head -n 5 || true
-          ls -lh /tmp/pages/ 2>&1 | head -n 20
+          ls -lh /tmp/pages/ 2>&1 | head -n 30
+          ls -lh /tmp/pages/docs/ 2>&1 | head -n 30
       - name: Upload artifact
         uses: actions/upload-pages-artifact@v3
         with:
