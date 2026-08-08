@@ -116,7 +116,7 @@ jobs:
           pytest -q --tb=line -k "not slow" --junitxml=../junit-integration.xml || echo "::warning::integration smoke soft fail"
       - name: Upload junit
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: junit-${{ matrix.python }}
           path: junit-*.xml
@@ -163,7 +163,7 @@ jobs:
 
       - name: Upload bench json
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: bench-json
           path: /tmp/bench_*.json
