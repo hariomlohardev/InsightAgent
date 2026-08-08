@@ -729,22 +729,8 @@ if not datasets:
             st.error(str(e))
     st.stop()
 
-# Main area - dataset details (instant first try 15s cached, then auto 30s retry for slow/wide CSV)
+# Main area - dataset details (instant 15s cached; fail fast — use Retry button)
 details = get_dataset_details(dataset_id)
-# auto-retry once with 30s for slow profile (>15s) before showing error — fixes e02d0503 “slow (>5s)” case where 15s still not enough on cold FS/parquet
-if not details or "dataset" not in details:
-    with st.spinner("Retrying dataset details with 30s timeout (slow/wide CSV, cold cache)..."):
-        try:
-            r = requests.get(
-                f"http://backend:8000/api/datasets/{dataset_id}",
-                timeout=30,
-                headers=_auth_headers(),
-            )
-            if r.status_code == 200 and "dataset" in r.json():
-                details = r.json()
-                st.toast("Loaded after 30s retry", icon="✅")
-        except Exception:
-            pass
 if not details or "dataset" not in details:
     st.error(
         f"Failed to load dataset details for `{dataset_id}` — file may be corrupted or deleted. Tried: {', '.join(_backend_bases())} (backend:8000 is inside Docker; localhost/host.docker.internal expected to fail there)"
