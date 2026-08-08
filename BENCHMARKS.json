@@ -1,0 +1,142 @@
+{
+  "meta": {
+    "generated_at": "2026-08-08T18:47:00Z",
+    "commit": "212b00615bc66b8fabfdaa9f1168bd435a0ce812",
+    "hardware": "12th Gen Intel i5-12500H, 7.6Gi RAM, WSL2 Ubuntu, no GPU",
+    "python": "3.12.3",
+    "polars": "1.10.0",
+    "pandas": "2.2.2",
+    "branch": "BF-01 baseline",
+    "note": "BF-01 machine-readable baseline — L10 before blazing. Targets in plan/blazfast/00_overview.md"
+  },
+  "baseline_1M": {
+    "polars": {
+      "rows": 1000000,
+      "cols": 5,
+      "engine": "polars",
+      "use_polars": true,
+      "read_ms": 312.8,
+      "profile_ms": 1479.1,
+      "total_ms": 1791.9,
+      "column_names": ["id", "value", "category", "date", "flag"],
+      "per_col": [
+        {"name": "id", "null_ms": 1.08, "nunique_ms": 26.42, "value_counts_ms": 0.05},
+        {"name": "value", "null_ms": 1.11, "nunique_ms": 46.68, "value_counts_ms": 0.05},
+        {"name": "category", "null_ms": 17.88, "nunique_ms": 15.39, "value_counts_ms": 24.7},
+        {"name": "date", "null_ms": 17.54, "nunique_ms": 97.6, "value_counts_ms": 270.27},
+        {"name": "flag", "null_ms": 1.0, "nunique_ms": 2.13, "value_counts_ms": 0.02}
+      ],
+      "duplicated_ms": 284.9,
+      "describe_ms": 423.2
+    },
+    "pandas": {
+      "rows": 1000000,
+      "cols": 5,
+      "engine": "pandas",
+      "use_polars": false,
+      "read_ms": 631.2,
+      "profile_ms": 1643.6,
+      "total_ms": 2274.8,
+      "column_names": ["id", "value", "category", "date", "flag"],
+      "per_col": [
+        {"name": "id", "null_ms": 0.77, "nunique_ms": 19.14, "value_counts_ms": 0.04},
+        {"name": "value", "null_ms": 1.12, "nunique_ms": 39.77, "value_counts_ms": 0.05},
+        {"name": "category", "null_ms": 18.66, "nunique_ms": 15.03, "value_counts_ms": 25.99},
+        {"name": "date", "null_ms": 17.23, "nunique_ms": 125.3, "value_counts_ms": 496.81},
+        {"name": "flag", "null_ms": 0.99, "nunique_ms": 2.82, "value_counts_ms": 0.03}
+      ],
+      "duplicated_ms": 286.1,
+      "describe_ms": 544.2
+    },
+    "rows": 1000000,
+    "cols": 5
+  },
+  "baseline_100k": {
+    "polars": {
+      "rows": 100000,
+      "cols": 5,
+      "engine": "polars",
+      "use_polars": true,
+      "read_ms": 101.0,
+      "profile_ms": 144.5,
+      "total_ms": 245.5,
+      "per_col": [
+        {"name": "id", "null_ms": 0.48, "nunique_ms": 1.59, "value_counts_ms": 0.03},
+        {"name": "value", "null_ms": 0.3, "nunique_ms": 2.54, "value_counts_ms": 0.02},
+        {"name": "category", "null_ms": 2.06, "nunique_ms": 1.62, "value_counts_ms": 2.85},
+        {"name": "date", "null_ms": 2.09, "nunique_ms": 10.41, "value_counts_ms": 23.19},
+        {"name": "flag", "null_ms": 0.27, "nunique_ms": 0.37, "value_counts_ms": 0.01}
+      ],
+      "duplicated_ms": 20.3,
+      "describe_ms": 38.1
+    },
+    "pandas": {
+      "rows": 100000,
+      "cols": 5,
+      "engine": "pandas",
+      "use_polars": false,
+      "read_ms": 52.8,
+      "profile_ms": 138.6,
+      "total_ms": 191.4
+    }
+  },
+  "read_engines_1M": {
+    "polars_scan": {"read_ms": 205.0, "rows": 1000000, "cols": 5},
+    "polars_streaming": {"read_ms": 38.8, "rows": 1000000},
+    "pandas": {"read_ms": 612.7, "rows": 1000000, "cols": 5},
+    "pandas_chunked": {"read_ms": 1677.6, "rows": 1000000},
+    "parquet": {"write_ms": 230.4, "read_ms": 298.7, "rows": 1000000},
+    "parquet_polars": {"read_ms": 59.7, "rows": 1000000},
+    "csv": "/tmp/bench_1000000.csv"
+  },
+  "chat_1M": {
+    "groupby_pandas_ms": 27,
+    "groupby_duckdb_ms": 14,
+    "groupby_100k_pandas_ms": 3,
+    "groupby_100k_duckdb_ms": 10,
+    "widget_100k_ms": 3
+  },
+  "cache": {
+    "note": "from BENCHMARKS.md and test_performance",
+    "first_MISS_ms": 45,
+    "second_HIT_ms": 6,
+    "HIT_header": "X-Cache: HIT",
+    "target_ms": 10
+  },
+  "locust_50u": {
+    "note": "from BENCHMARKS.md 2025-08-08",
+    "p95_ms": 85,
+    "with_redis_p95_ms": 85,
+    "fs_p95_ms": 120,
+    "target_p95_ms": 300,
+    "blazing_target_p95_ms": 60
+  },
+  "targets": {
+    "profile_10M_polars_ms": 900,
+    "profile_10M_pandas_ms": 1800,
+    "profile_1M_polars_ms": 400,
+    "profile_1M_pandas_ms": 800,
+    "chat_groupby_1M_ms": 25,
+    "widget_100k_ms": 5,
+    "cache_HIT_ms": 10,
+    "locust_50u_p95_ms": 60,
+    "locust_100u_p95_ms": 150,
+    "upload_100MB_ms": 2000
+  },
+  "bottlenecks": {
+    "B1_per_col_loop_ms": 600,
+    "B2_describe_ms": 423,
+    "B3_duplicated_ms": 285,
+    "B4_double_read_ms": 220,
+    "B5_frontend_payload_kb": 120,
+    "B6_list_q_ms": 90
+  },
+  "levels": {
+    "BF-01": {"name": "Measure", "status": "done", "commit": "212b006", "profile_1M_polars_ms": 1791.9},
+    "BF-02": {"name": "Hot Path", "status": "pending", "target_polars_ms": 400},
+    "BF-03": {"name": "Cache", "status": "pending"},
+    "BF-04": {"name": "Storage I/O", "status": "pending"},
+    "BF-05": {"name": "Frontend", "status": "pending"},
+    "BF-06": {"name": "Scale", "status": "pending"}
+  }
+}

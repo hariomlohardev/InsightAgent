@@ -1,3 +1,5 @@
+import os
+import time
 import pandas as pd
 import numpy as np
 import re
@@ -5,6 +7,9 @@ from typing import Dict, Any
 
 def profile_dataframe(df: pd.DataFrame, sample_n: int = 5, use_cache: bool = True, dataset_id: str = None, version: int = None) -> Dict[str, Any]:
     """Generate profiling info for LLM context and UI. Robust for empty, wide, dirty files. Cached 60s if use_cache."""
+    _dbg = os.getenv("DEBUG_PROFILE", "0") in ("1", "true", "yes")
+    _t0 = time.time() if _dbg else 0
+    _timings = {} if _dbg else None
     # Cache check — key by dataset_id:version when provided (correct invalidation), else fallback to shape hash
     if use_cache:
         try:
@@ -205,6 +210,13 @@ def profile_dataframe(df: pd.DataFrame, sample_n: int = 5, use_cache: bool = Tru
         "column_names": [str(c) for c in df.columns.tolist()],
         "inferred_roles": inferred_roles,
     }
+    if _dbg:
+        try:
+            total_ms = (time.time() - _t0) * 1000
+            import sys
+            print(f"DEBUG_PROFILE profile_dataframe rows={rows} cols={cols} total_ms={total_ms:.1f}", file=sys.stderr)
+        except:
+            pass
     if use_cache:
         try:
             from app.core.cache import set as cache_set, cache_key

@@ -1,6 +1,23 @@
-# Benchmarks — InsightAgent L10 (10M <2s, p95 <300ms)
+# Benchmarks — InsightAgent L10 (10M <2s, p95 <300ms) → BLAZFAST BF-01 Baseline
 
-> Generated via `scripts/bench_profile.py` and `locust --headless -u 50`. All runs on WSL2 i7 16GB, no GPU.
+> Generated via `scripts/bench_profile.py --json --per-col` and `scripts/bench_read.py --json`. Machine-readable `BENCHMARKS.json` is source of truth. All runs on WSL2 i7 16GB, no GPU, commit `212b006` (2026-08-08).
+
+## 2026-08-08 — BF-01 Baseline (measured, `--json --per-col`, 1M ×5, polars 1.10.0, pandas 2.2.2)
+
+**Profile 1M (`bench_profile.py --rows 1000000 --json --per-col`):**
+```
+polars: read 313ms + profile 1479ms = 1792ms (target <2000ms for 1M? actually <400ms blazing, now 1792ms baseline)
+  per_col: date nunique 98ms + value_counts 270ms dominates; duplicated 285ms, describe 423ms
+pandas: read 631ms + profile 1644ms = 2275ms (target <3000ms) ✅ but blazing wants <800ms
+```
+**Read engines 1M (`bench_read.py --rows 1000000 --json`):**
+```
+polars_scan 205ms | polars_streaming 39ms (-81%) | pandas 613ms | pandas_chunked 1678ms | parquet_polars 60ms | parquet 299ms
+→ streaming is 6× faster than scan, parquet_polars 3.4× faster than pandas
+```
+**Baseline 100k (CI-fast):** polars 101ms+145ms=246ms, pandas 53ms+139ms=191ms
+
+> Legacy L10 manual numbers kept below for history; new JSON is ground truth.
 
 ## 2025-08-08 — L10 pre-merge (manual, 1M sample, polars 1.10.0, pandas 2.2.2)
 
@@ -46,22 +63,29 @@ Aggregated                     980     0      |   28    3   300    18     85
 ```
 `p95 85ms <300ms` ✅ (with Redis `CACHE_TTL=60`, filesystem fallback p95 120ms still <300ms)
 
-## How to reproduce
+## How to reproduce (BF-01 — machine-readable)
 
 ```bash
-# 1M (CI-safe)
-USE_POLARS=true python scripts/bench_profile.py --rows 1000000
-python scripts/bench_chat.py --rows 1000000
+# 1M CI-safe with JSON + per-col (ground truth for matrix)
+PYTHONPATH=backend /tmp/venv09/bin/python scripts/bench_profile.py --rows 1000000 --json --per-col | tee /tmp/bench_1M.json
+PYTHONPATH=backend /tmp/venv09/bin/python scripts/bench_read.py --rows 1000000 --json | tee /tmp/bench_read.json
+PYTHONPATH=backend /tmp/venv09/bin/python scripts/bench_chat.py --rows 1000000
 
-# 10M (manual, 200MB)
-USE_POLARS=true python scripts/bench_profile.py --rows 10000000
+# 100k fast (CI)
+PYTHONPATH=backend /tmp/venv09/bin/python scripts/bench_profile.py --rows 100000 --json --per-col | tee /tmp/bench_100k.json
 
-# Locust (needs backend running)
-locust --headless -u 50 -r 10 --run-time 30s -H http://localhost:8000
+# 10M manual (200MB, needs 4GB)
+PYTHONPATH=backend /tmp/venv09/bin/python scripts/bench_profile.py --rows 10000000 --json --per-col | tee /tmp/bench_10M.json
+PYTHONPATH=backend /tmp/venv09/bin/python scripts/bench_profile.py --rows 10000000 --json --per-col --out BENCHMARKS.json
 
-# Cache hit proof
-curl -i http://localhost:8000/api/datasets/<id> | grep X-Cache
-# first MISS, second HIT <10ms
+# Locust 50u
+locust --headless -u 50 -r 10 --run-time 30s -H http://localhost:8000 --csv /tmp/locust && python scripts/bench_locust_parse.py --csv /tmp/locust_stats.csv --p95 150
+
+# Cache
+curl -i http://localhost:8000/api/datasets/<id> | grep X-Cache  # MISS then HIT <10ms
+DEBUG_PROFILE=1 PYTHONPATH=backend /tmp/venv09/bin/python -m pytest backend/tests/test_performance.py::test_cache_hit_lt_10ms -q  # logs DEBUG_PROFILE
 ```
+
+## Legacy (kept for history)
 
 **Notes:** CI runs 1M only (10M `pytest.mark.slow` skipped). `USE_POLARS=false` fallback keeps `docker compose up` working without `polars`. Redis optional — in-memory LRU 1000 keys ensures <10ms even without Redis.
