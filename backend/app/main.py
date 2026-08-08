@@ -44,6 +44,25 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+# BF-06 concurrency guard + X-Concurrency header (p95 <150ms at 100 users)
+import asyncio
+_chat_sem = asyncio.Semaphore(20)
+
+@app.middleware("http")
+async def _bf06_concurrency(request, call_next):
+    # only gate POST /api/chat
+    if request.url.path.startswith("/api/chat") and request.method == "POST":
+        async with _chat_sem:
+            resp = await call_next(request)
+            try:
+                # available slots = 20 - in_use
+                resp.headers["X-Concurrency"] = str(20 - _chat_sem._value) if hasattr(_chat_sem, "_value") else "20"
+                resp.headers["X-Queue"] = "HIT" if resp.headers.get("X-Cache") == "HIT" else "MISS"
+            except Exception:
+                pass
+            return resp
+    return await call_next(request)
+
 app.include_router(datasets.router)
 app.include_router(chat.router)
 try:
