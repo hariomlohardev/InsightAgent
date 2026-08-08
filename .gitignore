@@ -1,0 +1,36 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.env
+.venv
+venv/
+env/
+*.egg-info/
+dist/
+build/
+
+# Data & storage
+storage/
+*.db
+*.sqlite
+*.csv
+!sample_data/*.csv
+uploads/
+
+# Frontend
+frontend/.streamlit/
+
+# OS
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+*.log
+
+# Testing
+.pytest_cache/
+.coverage
+htmlcov/
+junit.xml

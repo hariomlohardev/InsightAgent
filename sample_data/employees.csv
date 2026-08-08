@@ -1,0 +1,13 @@
+Name,Department,Salary,Age,Experience_Years,Performance_Score,Region,Join_Date
+Alice,Engineering,95000,28,5,4.8,North,2019-03-15
+Bob,Sales,65000,32,7,4.2,South,2017-06-20
+Charlie,Engineering,105000,35,10,4.9,West,2015-01-10
+David,HR,55000,26,3,3.8,East,2021-02-01
+Eve,Sales,72000,29,4,4.5,North,2019-08-12
+Frank,Engineering,88000,31,6,4.6,South,2018-05-30
+Grace,Marketing,68000,27,4,4.1,West,2020-04-18
+Heidi,Sales,59000,24,2,3.9,East,2022-01-05
+Ivan,Engineering,115000,40,12,4.9,North,2013-07-22
+Judy,HR,62000,33,8,4.3,South,2016-11-11
+Karl,Marketing,71000,30,5,4.0,East,2019-09-10
+Liam,Sales,78000,36,9,4.7,West,2016-02-28

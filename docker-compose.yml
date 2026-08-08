@@ -1,0 +1,24 @@
+version: "3.8"
+services:
+  backend:
+    build: ./backend
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./storage:/app/storage
+      - ./sample_data:/app/sample_data
+    env_file:
+      - .env
+    environment:
+      - STORAGE_PATH=/app/storage
+    restart: unless-stopped
+
+  frontend:
+    build: ./frontend
+    ports:
+      - "8501:8501"
+    depends_on:
+      - backend
+    environment:
+      - BACKEND_URL=http://backend:8000
+    restart: unless-stopped

@@ -1,0 +1,25 @@
+Date,Product,Category,Region,Sales,Quantity,Price,Customer_Segment
+2024-01-05,Laptop,Electronics,North,12000,2,6000,Enterprise
+2024-01-12,Mouse,Electronics,South,500,10,50,Small Business
+2024-01-15,Desk,Furniture,North,3000,3,1000,Enterprise
+2024-01-20,Chair,Furniture,East,1500,5,300,Consumer
+2024-02-03,Laptop,Electronics,West,18000,3,6000,Enterprise
+2024-02-10,Keyboard,Electronics,South,800,8,100,Consumer
+2024-02-18,Desk,Furniture,North,2000,2,1000,Small Business
+2024-02-25,Chair,Furniture,West,900,3,300,Consumer
+2024-03-02,Laptop,Electronics,North,6000,1,6000,Consumer
+2024-03-08,Mouse,Electronics,East,250,5,50,Consumer
+2024-03-15,Desk,Furniture,South,1000,1,1000,Small Business
+2024-03-20,Chair,Furniture,North,600,2,300,Consumer
+2024-04-05,Laptop,Electronics,West,24000,4,6000,Enterprise
+2024-04-10,Mouse,Electronics,North,750,15,50,Enterprise
+2024-04-18,Keyboard,Electronics,East,1200,12,100,Small Business
+2024-04-22,Desk,Furniture,South,4000,4,1000,Enterprise
+2024-05-03,Chair,Furniture,East,1800,6,300,Consumer
+2024-05-10,Laptop,Electronics,South,12000,2,6000,Small Business
+2024-05-15,Mouse,Electronics,West,1000,20,50,Enterprise
+2024-05-20,Desk,Furniture,North,5000,5,1000,Enterprise
+2024-06-01,Chair,Furniture,South,1200,4,300,Small Business
+2024-06-07,Laptop,Electronics,East,18000,3,6000,Enterprise
+2024-06-15,Keyboard,Electronics,North,1500,15,100,Consumer
+2024-06-20,Mouse,Electronics,South,600,12,50,Consumer
