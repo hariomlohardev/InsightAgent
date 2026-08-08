@@ -1,0 +1,24 @@
+# Auto-label by path (used by contributor.yml)
+"backend":
+  - changed-files:
+      - any-glob-to-any-file: backend/**
+
+"frontend":
+  - changed-files:
+      - any-glob-to-any-file: frontend/**
+
+"perf":
+  - changed-files:
+      - any-glob-to-any-file: scripts/bench*.py
+      - any-glob-to-any-file: BENCHMARKS.*
+
+"docker":
+  - changed-files:
+      - any-glob-to-any-file: docker-compose*.yml
+      - any-glob-to-any-file: Dockerfile*
+
+"docs":
+  - changed-files:
+      - any-glob-to-any-file: docs/**
+      - any-glob-to-any-file: "*.md"
+

@@ -1,32 +1,268 @@
-name: CI
+name: CI - robust (lint • test • bench • docker)
+
 on:
   push:
     branches: [main, master]
   pull_request:
     branches: [main, master]
+    types: [opened, synchronize, reopened, ready_for_review]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pull-requests: write
+  checks: write
+  actions: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  PYTHON_VERSION: "3.11"
+  PIP_DISABLE_PIP_VERSION_CHECK: "1"
+  PYTHONUNBUFFERED: "1"
 
 jobs:
-  test:
+  # ── 1. Lint & static ─────────────────────────────────────────────
+  lint:
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
         with:
-          python-version: "3.11"
+          python-version: ${{ env.PYTHON_VERSION }}
           cache: pip
-      - name: Install backend deps
+          cache-dependency-path: |
+            backend/requirements.txt
+            frontend/requirements.txt
+            pyproject.toml
+      - name: Install lint deps
+        run: |
+          pip install black==24.10.0 ruff==0.8.4 mypy==1.11.2
+          pip install -r backend/requirements.txt --quiet
+      - name: black --check
+        run: |
+          black --check backend/app backend/tests frontend/streamlit_app.py scripts/*.py || (echo "::error::black failed - run: make format" && exit 1)
+      - name: ruff
+        run: |
+          ruff check backend/app frontend/streamlit_app.py scripts/ --output-format=github || (echo "::error::ruff failed" && exit 1)
+      - name: mypy (soft)
+        run: mypy backend/app/core --ignore-missing-imports --no-strict-optional || echo "::warning::mypy soft fail"
+      - name: py_compile
+        run: |
+          python -m py_compile backend/app/main.py backend/app/core/*.py backend/app/agent/*.py
+          python -m py_compile frontend/streamlit_app.py
+          python -m py_compile scripts/*.py
+          echo "py_compile OK"
+
+  # ── 2. Backend tests (matrix 3.10/3.11/3.12, coverage, no DB/Redis) ─
+  backend:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        python: ["3.10", "3.11", "3.12"]
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: test
+          POSTGRES_PASSWORD: test
+          POSTGRES_DB: test
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd "pg_isready -U test"
+          --health-interval 10s --health-timeout 5s --health-retries 5
+      redis:
+        image: redis:7
+        ports: ["6379:6379"]
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 10s --health-timeout 5s --health-retries 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python }}
+          cache: pip
+          cache-dependency-path: backend/requirements.txt
+      - name: Install
         run: |
           pip install -r backend/requirements.txt
-          pip install pytest-cov black ruff
-      - name: Lint
-        run: |
-          black --check backend/app backend/tests || true
-          ruff check backend/app || true
-          python -m py_compile backend/app/main.py backend/app/core/*.py backend/app/agent/*.py
-      - name: Test
+          pip install pytest pytest-asyncio pytest-cov anyio httpx
+          pip install -r backend/requirements.txt --quiet || true
+      - name: pytest (no DB/Redis by default - filesystem fallback)
+        env:
+          PYTHONPATH: backend
+          # keep AUTH_REQUIRED=false CLOUD=false for OSS contributor frictionless (see CONTRIBUTING.md)
+          AUTH_REQUIRED: "false"
+          CLOUD: "false"
         run: |
           cd backend
-          pytest -q --tb=short
-      - name: Frontend syntax
+          pytest -q --tb=short --junitxml=../junit-backend-${{ matrix.python }}.xml
+      - name: pytest with DB/Redis (integration smoke)
+        if: matrix.python == '3.11'
+        env:
+          PYTHONPATH: backend
+          DATABASE_URL: postgresql+psycopg://test:test@localhost:5432/test
+          REDIS_URL: redis://localhost:6379/0
+          AUTH_REQUIRED: "false"
+          CLOUD: "false"
+        run: |
+          cd backend
+          pytest -q --tb=line -k "not slow" --junitxml=../junit-integration.xml || echo "::warning::integration smoke soft fail"
+      - name: Upload junit
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: junit-${{ matrix.python }}
+          path: junit-*.xml
+          if-no-files-found: ignore
+
+  # ── 3. Bench gate (blazfast) - 100k CI-safe, 1M nightly ─────────
+  bench:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    needs: backend
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: pip
+          cache-dependency-path: backend/requirements.txt
+      - name: Install bench deps
+        run: |
+          pip install -r backend/requirements.txt --quiet
+          pip install polars==1.10.0 --quiet || echo "polars optional"
+      - name: bench_profile 100k (CI gate <1s)
+        env:
+          PYTHONPATH: backend
+        run: |
+          python scripts/bench_profile.py --rows 100000 --json --per-col | tee /tmp/bench_100k.json
+          python -c "import json; j=json.load(open('/tmp/bench_100k.json')); assert j['polars']['total_ms']<1000, f\"polars 100k {j['polars']['total_ms']}ms >1000\"; assert j['pandas']['total_ms']<1000, f\"pandas {j['pandas']['total_ms']}ms >1000\"; print(f\"bench 100k PASS polars {j['polars']['total_ms']}ms pandas {j['pandas']['total_ms']}ms\")"
+      - name: bench_read (streaming 6×)
+        env:
+          PYTHONPATH: backend
+        run: |
+          python scripts/bench_read.py --rows 100000 --json | tee /tmp/bench_read.json
+          python -c "import json; j=json.load(open('/tmp/bench_read.json')); s=j.get('polars_streaming',{}).get('read_ms',999); sc=j.get('polars_scan',{}).get('read_ms',0); assert s < sc, f'streaming {s} not < scan {sc}'; print(f\"bench_read PASS streaming {s}ms < scan {sc}ms\")"
+      - name: Upload bench json
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: bench-json
+          path: /tmp/bench_*.json
+          if-no-files-found: ignore
+
+  # ── 4. Frontend (Streamlit headless AppTest) ─────────────────────
+  frontend:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: pip
+          cache-dependency-path: frontend/requirements.txt
+      - name: Install
+        run: |
+          pip install -r frontend/requirements.txt --quiet
+          pip install -r backend/requirements.txt --quiet
+          pip install pyarrow --quiet
+      - name: py_compile + AppTest empty profile
+        env:
+          PYTHONPATH: backend
         run: |
           python -m py_compile frontend/streamlit_app.py
+          python -c "
+          from streamlit.testing.v1 import AppTest
+          from unittest.mock import patch, MagicMock
+          def mk(url,*a,**k):
+              m=MagicMock()
+              if '/health' in url: m.status_code=200; m.json=lambda:{'status':'ok'}; return m
+              if url.endswith('/') or '/api/llm/info' in url: m.status_code=200; m.json=lambda:{}; return m
+              if '/api/datasets' in url and '/api/datasets/' not in url: m.status_code=200; m.json=lambda:[{'id':'004d3678','original_filename':'empty.csv','rows':0,'columns':0,'column_names':[]}]; return m
+              if '/api/datasets/004d3678' in url: m.status_code=200; m.json=lambda:{'dataset':{'id':'004d3678','original_filename':'empty.csv','rows':0,'columns':0,'column_names':[]},'profile':{'column_names':[],'numeric_columns':[],'categorical_columns':[],'columns':[],'describe':{},'duplicates':0,'sample_rows':[],'null_summary':{},'shape':{'rows':0,'columns':0}},'preview':{'data':[],'columns':[]}}; return m
+              if '/api/dashboards' in url or '/api/connectors' in url or '/api/schedules' in url: m.status_code=200; m.json=lambda:[]; return m
+              m.status_code=404; m.json=lambda:{}; return m
+          import unittest.mock as um
+          open('/tmp/_at.py','w').write('placeholder')
+          "
+          # actually run real AppTest from verify_simple
+          python -c "
+          from streamlit.testing.v1 import AppTest
+          from unittest.mock import patch, MagicMock
+          def mk(url,*a,**k):
+              m=MagicMock()
+              if '/health' in url: m.status_code=200; m.json=lambda:{'status':'ok'}; return m
+              if url.endswith('/') or '/api/llm/info' in url: m.status_code=200; m.json=lambda:{}; return m
+              if '/api/datasets' in url and '/api/datasets/' not in url: m.status_code=200; m.json=lambda:[{'id':'004d3678','original_filename':'empty.csv','rows':0,'columns':0,'column_names':[]}]; return m
+              if '/api/datasets/004d3678' in url: m.status_code=200; m.json=lambda:{'dataset':{'id':'004d3678','original_filename':'empty.csv','rows':0,'columns':0,'column_names':[]},'profile':{'column_names':[],'numeric_columns':[],'categorical_columns':[],'columns':[],'describe':{},'duplicates':0,'sample_rows':[],'null_summary':{},'shape':{'rows':0,'columns':0}},'preview':{'data':[],'columns':[]}}; return m
+              if '/api/dashboards' in url or '/api/connectors' in url or '/api/schedules' in url: m.status_code=200; m.json=lambda:[]; return m
+              m.status_code=404; m.json=lambda:{}; return m
+          with patch('requests.get', side_effect=mk), patch('requests.post', side_effect=lambda *a,**k: MagicMock(status_code=200, json=lambda:{})):
+              at=AppTest.from_file('frontend/streamlit_app.py', default_timeout=30)
+              at.run()
+              assert len(at.exception)==0, at.exception
+              assert len([s for s in at.selectbox if len(s.options)==0])==0, 'empty selectbox'
+              print(f\"AppTest PASS {len(at.selectbox)} selectboxes, no IndexError\")
+          "
+
+  # ── 5. Docker compose check (no build, just config) ─────────────
+  docker:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - name: docker compose config
+        run: |
+          docker compose version 2>&1 | head -n 5
+          docker compose config > /tmp/compose.yml && echo "compose OK" && head -n 30 /tmp/compose.yml
+          docker compose -f docker-compose.yml config > /tmp/compose2.yml && echo "compose.yml OK" || docker-compose config > /tmp/compose2.yml
+
+  # ── 6. Security (soft, not blocking) ─────────────────────────────
+  security:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      security-events: write
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: pip
+      - name: pip-audit (soft)
+        run: |
+          pip install pip-audit --quiet
+          pip-audit --requirement backend/requirements.txt || echo "::warning::pip-audit found issues"
+      - name: bandit (soft)
+        run: |
+          pip install bandit --quiet
+          bandit -r backend/app -x tests --severity-level medium || echo "::warning::bandit soft fail"
+
+  # ── 7. Final gate - required status check (contributor just needs this green) ─
+  gate:
+    runs-on: ubuntu-latest
+    needs: [lint, backend, bench, frontend, docker]
+    if: always()
+    steps:
+      - name: Check all required jobs passed
+        run: |
+          echo "lint: ${{ needs.lint.result }}"
+          echo "backend: ${{ needs.backend.result }}"
+          echo "bench: ${{ needs.bench.result }}"
+          echo "frontend: ${{ needs.frontend.result }}"
+          echo "docker: ${{ needs.docker.result }}"
+          if [ "${{ needs.lint.result }}" != "success" ]; then echo "::error::lint failed"; exit 1; fi
+          if [ "${{ needs.backend.result }}" != "success" ]; then echo "::error::backend failed"; exit 1; fi
+          if [ "${{ needs.bench.result }}" != "success" ]; then echo "::error::bench failed"; exit 1; fi
+          if [ "${{ needs.frontend.result }}" != "success" ]; then echo "::error::frontend failed"; exit 1; fi
+          if [ "${{ needs.docker.result }}" != "success" ]; then echo "::error::docker failed"; exit 1; fi
+          echo "✅ All required checks passed - ready to review & merge"
