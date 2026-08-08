@@ -1,0 +1,54 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "insightagent"
+version = "1.0.0"
+description = "InsightAgent — Chat with your CSV/Excel/SQL"
+readme = "README.md"
+license = {text = "MIT"}
+requires-python = ">=3.10"
+dependencies = []
+
+[tool.black]
+line-length = 100
+target-version = ["py310"]
+exclude = "alembic|migrations|\\.venv"
+
+[tool.ruff]
+line-length = 100
+target-version = "py310"
+exclude = ["alembic", "migrations"]
+[tool.ruff.lint]
+select = ["E", "F", "W", "C90"]
+ignore = ["E501"]
+[tool.ruff.lint.mccabe]
+max-complexity = 15
+
+[tool.mypy]
+python_version = "3.10"
+warn_return_any = true
+warn_unused_configs = true
+disallow_untyped_defs = false
+ignore_missing_imports = true
+exclude = "alembic|tests|sdk"
+[[tool.mypy.overrides]]
+module = "app.core.*"
+disallow_untyped_defs = false
+warn_return_any = true
+ignore_missing_imports = true
+strict = false
+
+[tool.coverage.run]
+source = ["backend/app"]
+omit = ["*/tests/*", "*/alembic/*", "*/__pycache__/*", "*/migrations/*"]
+[tool.coverage.report]
+fail_under = 95
+show_missing = true
+skip_covered = false
+
+[tool.pytest.ini_options]
+testpaths = ["backend/tests", "sdk/tests"]
+addopts = "-q"
+asyncio_mode = "auto"

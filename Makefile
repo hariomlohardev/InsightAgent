@@ -19,15 +19,18 @@ test-verbose:
 	cd backend && python -m pytest tests -v --tb=short
 
 cov:
-	cd backend && python -m pytest tests --cov=app --cov-report=term-missing --cov-report=html --cov-fail-under=80 -q || python -m pytest tests -q
+	cd backend && python -m pytest tests --cov=app --cov-report=term-missing --cov-report=html --cov-fail-under=95 -q || python -m pytest tests -q
 
 format:
 	cd backend && python -m black app/ tests/ 2>/dev/null || black app/ tests/ || true
 	cd frontend && python -m black streamlit_app.py 2>/dev/null || black streamlit_app.py || true
+	cd sdk && python -m black insightagent/ tests/ 2>/dev/null || black sdk/insightagent sdk/tests || true
 
 lint:
 	cd backend && python -m ruff check app/ 2>/dev/null || ruff check app/ || true
+	cd backend && python -m mypy app/core --ignore-missing-imports --no-strict-optional 2>/dev/null || mypy app/core --ignore-missing-imports || true
 	cd backend && python -m py_compile app/main.py app/core/*.py app/agent/*.py 2>/dev/null && echo "py_compile OK"
+	cd backend && python -m black --check app/ tests/ 2>/dev/null && echo "black OK" || echo "black check needed"
 
 run-backend:
 	cd backend && uvicorn app.main:app --reload --port 8000 --host 0.0.0.0
