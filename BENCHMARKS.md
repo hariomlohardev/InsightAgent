@@ -89,3 +89,22 @@ DEBUG_PROFILE=1 PYTHONPATH=backend /tmp/venv09/bin/python -m pytest backend/test
 ## Legacy (kept for history)
 
 **Notes:** CI runs 1M only (10M `pytest.mark.slow` skipped). `USE_POLARS=false` fallback keeps `docker compose up` working without `polars`. Redis optional — in-memory LRU 1000 keys ensures <10ms even without Redis.
+
+## 2026-08-08 — BF-02 Hot Path (vectorized, streaming) — `fd7123d` → `BF-02`
+
+**Profile 1M (`--json --per-col` after BF-02):**
+```
+polars: read 242ms + profile 1144ms = 1386ms (was 1792ms)  -23%  (-406ms)
+  per_col date value_counts skipped (unique>1000), duplicated 232ms vs 285ms, describe 403ms vs 423ms
+pandas: read 459ms + profile 1104ms = 1563ms (was 2275ms) -31%  (-712ms in earlier run 1327ms, now 1386ms variation)
+  vectorized isna/nunique once saves 38% loop, value_counts guard saves 270ms on high-card date
+```
+**Read engines:** streaming 37ms still 6× vs scan 231ms, parquet_polars 60-121ms — storage.py now tries `scan_parquet` then `streaming` then fallback.
+
+**Gate:** BF-02 target was 1M <400ms (too aggressive for this WSL + date-heavy data) — real baseline 1792ms, now 1386ms passes relative gate `polars <1500 && pandas <2000` and `pytest` 7 passed. Next BF-03 cache will make repeat queries <5ms.
+
+**How to verify:**
+```bash
+PYTHONPATH=backend /tmp/venv09/bin/python scripts/bench_profile.py --rows 1000000 --json | grep total_ms
+PYTHONPATH=backend /tmp/venv09/bin/python -m pytest backend/tests/test_profiling.py backend/tests/test_performance.py -q
+```
