@@ -1,5 +1,5 @@
 # Core - keep pinned for reproducibility, but allow minor upgrades
-APScheduler==3.10.4
+APScheduler==3.11.3
 reportlab==4.1.0
 fastapi==0.110.2
 uvicorn[standard]==0.30.1
