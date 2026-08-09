@@ -1,5 +1,3 @@
-import os
-import json
 import re
 from typing import Dict, Any
 
@@ -28,7 +26,7 @@ def _sql_to_pandas_fallback_hint(sql: str) -> str:
     return "Tip: Add OPENAI_API_KEY/GROQ_API_KEY for NL→SQL, or type raw SQL like SELECT * FROM df WHERE ..."
 
 
-def fallback_coder(query: str, profile: Dict[str, Any]) -> Dict[str, str]:
+def fallback_coder(query: str, profile: Dict[str, Any]) -> Dict[str, str]:  # noqa: C901
     """Rule-based coder covering 15+ common patterns + SQL branch for L4. No LLM needed."""
     q = query.lower().strip()
     cols = profile.get("column_names", [])
@@ -73,7 +71,7 @@ def fallback_coder(query: str, profile: Dict[str, Any]) -> Dict[str, str]:
     if q.strip().startswith("select") or q.strip().startswith("with"):
         sql = query.strip().rstrip(";")
         if _is_write_sql(q):
-            code = f"result = df.head(10)\nfig = px.bar(result.head(5), x=result.columns[0], y=result.columns[1] if len(result.columns)>1 else result.columns[0], title='Blocked: read-only SQL only')"
+            code = "result = df.head(10)\nfig = px.bar(result.head(5), x=result.columns[0], y=result.columns[1] if len(result.columns)>1 else result.columns[0], title='Blocked: read-only SQL only')"
             explanation = "Blocked DDL/DML, only SELECT allowed"
             return {"code": code, "explanation": explanation}
         where_match = re.search(r"where\s+(.+)", sql, re.IGNORECASE)
@@ -118,7 +116,7 @@ def fallback_coder(query: str, profile: Dict[str, Any]) -> Dict[str, str]:
             try:
                 periods = int(m.group(1))
                 periods = max(1, min(periods, 12))
-            except:
+            except Exception:
                 periods = 3
         # Find freq
         freq = "M"
@@ -244,7 +242,7 @@ def fallback_coder(query: str, profile: Dict[str, Any]) -> Dict[str, str]:
     ):
         safe_q = query.replace("'", r"\'").replace("\n", " ").replace("'''", "'")[:500]
         code = f"result = analyze_why(df, {repr(profile)}, '''{safe_q}''')\nfig = px.bar(result, x='category', y='delta', title='Why analysis: delta by category (top contributors)', color='delta', color_continuous_scale='RdBu')"
-        explanation = f"Why analysis via cohort diff"
+        explanation = "Why analysis via cohort diff"
         return {"code": code, "explanation": explanation}
     # Also fallback: if intent is analytics and query is drop/increase without why but analytics planner flagged
     if profile.get("_intent") == "analytics" or intent_hint == "analytics":
@@ -308,10 +306,10 @@ def fallback_coder(query: str, profile: Dict[str, Any]) -> Dict[str, str]:
                     code = f"result = df.drop_duplicates(subset=['{col_match}'])\nfig = px.bar(pd.DataFrame({{'metric':['before','after'], 'value':[len(df), len(result)]}}), x='metric', y='value', title='Duplicates removed on {col_match}')"
                     explanation = f"Removed duplicates on {col_match}"
                 else:
-                    code = f"result = df.drop_duplicates()\nfig = px.bar(pd.DataFrame({{'metric':['before','after'], 'value':[len(df), len(result)]}}), x='metric', y='value', title='Duplicates removed')"
+                    code = "result = df.drop_duplicates()\nfig = px.bar(pd.DataFrame({'metric':['before','after'], 'value':[len(df), len(result)]}), x='metric', y='value', title='Duplicates removed')"
                     explanation = "Removed duplicates"
             else:
-                code = f"result = df.drop_duplicates()\nfig = px.bar(pd.DataFrame({{'metric':['before','after'], 'value':[len(df), len(result)]}}), x='metric', y='value', title='Duplicates removed')"
+                code = "result = df.drop_duplicates()\nfig = px.bar(pd.DataFrame({'metric':['before','after'], 'value':[len(df), len(result)]}), x='metric', y='value', title='Duplicates removed')"
                 explanation = "Removed duplicates"
             return {"code": code, "explanation": explanation}
 
@@ -355,9 +353,9 @@ def fallback_coder(query: str, profile: Dict[str, Any]) -> Dict[str, str]:
             else:
                 # Fill all numeric nulls
                 if strategy == "median":
-                    code = f"result = df.copy()\nfor col in result.select_dtypes(include=['number']).columns:\n    result[col] = result[col].fillna(result[col].median())\nfig = px.bar(pd.DataFrame({{'metric':['nulls_before','nulls_after'], 'value':[df.isna().sum().sum(), result.isna().sum().sum()]}}), x='metric', y='value', title='Filled all numeric nulls with median')"
+                    code = "result = df.copy()\nfor col in result.select_dtypes(include=['number']).columns:\n    result[col] = result[col].fillna(result[col].median())\nfig = px.bar(pd.DataFrame({'metric':['nulls_before','nulls_after'], 'value':[df.isna().sum().sum(), result.isna().sum().sum()]}), x='metric', y='value', title='Filled all numeric nulls with median')"
                 else:
-                    code = f"result = df.copy()\nfor col in result.select_dtypes(include=['number']).columns:\n    result[col] = result[col].fillna(result[col].mean())\nfig = px.bar(pd.DataFrame({{'metric':['nulls_before','nulls_after'], 'value':[df.isna().sum().sum(), result.isna().sum().sum()]}}), x='metric', y='value', title='Filled nulls')"
+                    code = "result = df.copy()\nfor col in result.select_dtypes(include=['number']).columns:\n    result[col] = result[col].fillna(result[col].mean())\nfig = px.bar(pd.DataFrame({'metric':['nulls_before','nulls_after'], 'value':[df.isna().sum().sum(), result.isna().sum().sum()]}), x='metric', y='value', title='Filled nulls')"
                 explanation = f"Filled nulls with {strategy}"
             return {"code": code, "explanation": explanation}
 
@@ -384,7 +382,7 @@ def fallback_coder(query: str, profile: Dict[str, Any]) -> Dict[str, str]:
                 if col:
                     code = f"result = df.dropna(subset=['{col}'])\nfig = px.bar(pd.DataFrame({{'metric':['rows_before','rows_after'], 'value':[len(df), len(result)]}}), x='metric', y='value', title='Dropped rows where {col} is null')"
                 else:
-                    code = f"result = df.dropna()\nfig = px.bar(pd.DataFrame({{'metric':['rows_before','rows_after'], 'value':[len(df), len(result)]}}), x='metric', y='value', title='Dropped rows with nulls')"
+                    code = "result = df.dropna()\nfig = px.bar(pd.DataFrame({'metric':['rows_before','rows_after'], 'value':[len(df), len(result)]}), x='metric', y='value', title='Dropped rows with nulls')"
                 explanation = "Dropped rows with nulls"
                 return {"code": code, "explanation": explanation}
             # Drop rows where condition like Sales == 0
@@ -457,7 +455,7 @@ def fallback_coder(query: str, profile: Dict[str, Any]) -> Dict[str, str]:
             if col:
                 code = f"result = df.copy()\nresult['{col}'] = result['{col}'].astype(str).str.strip()\nfig = px.bar(pd.DataFrame({{'metric':['trimmed']}}), x='metric', y=[1], title='Trimmed {col}')"
             else:
-                code = f"result = df.copy()\nfor col in result.select_dtypes(include=['object']).columns:\n    result[col] = result[col].astype(str).str.strip()\nfig = px.bar(pd.DataFrame({{'metric':['trimmed']}}), x='metric', y=[1], title='Trimmed whitespace')"
+                code = "result = df.copy()\nfor col in result.select_dtypes(include=['object']).columns:\n    result[col] = result[col].astype(str).str.strip()\nfig = px.bar(pd.DataFrame({'metric':['trimmed']}), x='metric', y=[1], title='Trimmed whitespace')"
             explanation = "Trimmed whitespace"
             return {"code": code, "explanation": explanation}
 
@@ -472,17 +470,17 @@ def fallback_coder(query: str, profile: Dict[str, Any]) -> Dict[str, str]:
                 if col:
                     code = f"result = df.copy()\nresult['{col}'] = result['{col}'].astype(str).str.lower()\nfig = px.bar(pd.DataFrame({{'x':['lower']}}), x='x', y=[1], title='Standardized {col} to lower')"
                 else:
-                    code = f"result = df.copy()\nfor col in result.select_dtypes(include=['object']).columns:\n    result[col] = result[col].astype(str).str.lower()\nfig = px.bar(pd.DataFrame({{'x':['lower']}}), x='x', y=[1], title='Standardized to lower')"
+                    code = "result = df.copy()\nfor col in result.select_dtypes(include=['object']).columns:\n    result[col] = result[col].astype(str).str.lower()\nfig = px.bar(pd.DataFrame({'x':['lower']}), x='x', y=[1], title='Standardized to lower')"
             elif "upper" in q.lower():
                 if col:
                     code = f"result = df.copy()\nresult['{col}'] = result['{col}'].astype(str).str.upper()\nfig = px.bar(pd.DataFrame({{'x':['upper']}}), x='x', y=[1], title='Standardized {col} to upper')"
                 else:
-                    code = f"result = df.copy()\nfor col in result.select_dtypes(include=['object']).columns:\n    result[col] = result[col].astype(str).str.upper()\nfig = px.bar(pd.DataFrame({{'x':['upper']}}), x='x', y=[1], title='Standardized to upper')"
+                    code = "result = df.copy()\nfor col in result.select_dtypes(include=['object']).columns:\n    result[col] = result[col].astype(str).str.upper()\nfig = px.bar(pd.DataFrame({'x':['upper']}), x='x', y=[1], title='Standardized to upper')"
             else:
                 if col:
                     code = f"result = df.copy()\nresult['{col}'] = result['{col}'].astype(str).str.title()\nfig = px.bar(pd.DataFrame({{'x':['title']}}), x='x', y=[1], title='Standardized {col} to title')"
                 else:
-                    code = f"result = df.copy()\nfor col in result.select_dtypes(include=['object']).columns:\n    result[col] = result[col].astype(str).str.title()\nfig = px.bar(pd.DataFrame({{'x':['title']}}), x='x', y=[1], title='Standardized')"
+                    code = "result = df.copy()\nfor col in result.select_dtypes(include=['object']).columns:\n    result[col] = result[col].astype(str).str.title()\nfig = px.bar(pd.DataFrame({'x':['title']}), x='x', y=[1], title='Standardized')"
             explanation = "Standardized case"
             return {"code": code, "explanation": explanation}
 
@@ -525,7 +523,7 @@ def fallback_coder(query: str, profile: Dict[str, Any]) -> Dict[str, str]:
                 return {"code": code, "explanation": explanation}
 
         # 10. Generic clean fallback
-        code = f"result = df.dropna().drop_duplicates()\nfig = px.bar(pd.DataFrame({{'metric':['rows_before','rows_after'], 'value':[len(df), len(result)]}}), x='metric', y='value', title='Cleaned data')"
+        code = "result = df.dropna().drop_duplicates()\nfig = px.bar(pd.DataFrame({'metric':['rows_before','rows_after'], 'value':[len(df), len(result)]}), x='metric', y='value', title='Cleaned data')"
         explanation = "Cleaned data (drop nulls + duplicates)"
         return {"code": code, "explanation": explanation}
 
@@ -616,7 +614,7 @@ def fallback_coder(query: str, profile: Dict[str, Any]) -> Dict[str, str]:
         if len(numeric_cols) >= 2:
             code = f"result = df[{numeric_cols}].corr(numeric_only=True)\nfig = px.imshow(result, text_auto=True, aspect='auto', title='Correlation Heatmap', color_continuous_scale='RdBu_r')"
         else:
-            code = f"result = df.corr(numeric_only=True)\nfig = px.imshow(result, text_auto=True, title='Correlation Heatmap')"
+            code = "result = df.corr(numeric_only=True)\nfig = px.imshow(result, text_auto=True, title='Correlation Heatmap')"
         explanation = "Correlation matrix of numeric columns"
         return {"code": code, "explanation": explanation}
 
@@ -653,7 +651,7 @@ def fallback_coder(query: str, profile: Dict[str, Any]) -> Dict[str, str]:
                 code = f"fig = px.scatter(df, x='{x}', y='{y}', title='{y} vs {x}', trendline='ols')\nresult = df[['{x}', '{y}']].head(10)"
         else:
             code = f"fig = px.scatter(df, x='{cols[0]}', y='{cols[1]}' if len(df.columns)>1 else '{cols[0]}', title='Scatter')\nresult = df.head(10)"
-        explanation = f"Scatter plot"
+        explanation = "Scatter plot"
         return {"code": code, "explanation": explanation}
 
     # 7. Average / mean / median / sum / count
@@ -718,7 +716,7 @@ def fallback_coder(query: str, profile: Dict[str, Any]) -> Dict[str, str]:
         condition_escaped = condition.replace("'", "\\'").replace('"', "'")
         # If condition still contains query words, fallback to head
         if len(condition_escaped) < 2 or condition_escaped.lower() in ["filter", "where"]:
-            code = f"result = df.head(20)\nfig = px.bar(result.head(10), x=result.columns[0], y=result.columns[1] if len(result.columns)>1 else result.columns[0], title='Filtered Preview')"
+            code = "result = df.head(20)\nfig = px.bar(result.head(10), x=result.columns[0], y=result.columns[1] if len(result.columns)>1 else result.columns[0], title='Filtered Preview')"
         else:
             # Use duckdb for more robust filtering if available, else df.query
             code = f"try:\n    result = df.query('{condition_escaped}', engine='python')\nexcept Exception:\n    try:\n        result = duckdb.query(\"SELECT * FROM df WHERE {condition_escaped}\").to_df()\n    except Exception:\n        result = df.head(20)\nfig = px.bar(result.head(10), x=result.columns[0] if len(result.columns)>0 else 'x', y=result.columns[1] if len(result.columns)>1 else result.columns[0], title='Filtered Result')"
