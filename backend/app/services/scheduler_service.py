@@ -1,6 +1,6 @@
 import uuid
 import json
-from datetime import datetime
+from datetime import timezone, datetime
 from pathlib import Path
 from typing import Dict, Any, List, Optional
 from app.config import get_storage_path
@@ -80,7 +80,7 @@ def create_schedule(data: Dict[str, Any]) -> Dict[str, Any]:
     name = data.get("name") or f"Schedule {dashboard_id or query[:20]}"
     threshold = data.get("threshold")  # optional: {"pct": 10, "direction": "drop"}
     sid = str(uuid.uuid4())[:8]
-    now = datetime.utcnow().isoformat()
+    now = datetime.now(timezone.utc).isoformat()
     sched = {
         "id": sid,
         "name": name[:120],
@@ -129,7 +129,7 @@ def _record_run(sid: str, status: str, detail: str = "", pdf_bytes_len: int = 0)
     sched = get_schedule(sid)
     if not sched:
         return
-    now = datetime.utcnow().isoformat()
+    now = datetime.now(timezone.utc).isoformat()
     run = {"at": now, "status": status, "detail": detail[:500], "pdf_bytes": pdf_bytes_len}
     runs = sched.get("runs", [])
     runs.insert(0, run)

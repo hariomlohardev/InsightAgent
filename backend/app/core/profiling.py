@@ -26,11 +26,21 @@ def profile_dataframe(
                 # Primary key for 10.2: profile:{dataset_id}:{version}
                 ck = cache_key(f"profile:{dataset_id}:{version if version is not None else 0}")
             else:
+                # Stable fallback key (no id(df) — use content hash for versioned datasets, shape+cols for ad-hoc)
+                try:
+                    # Use hash of first row values as stable identity for ad-hoc DFs
+                    _sample_hash = (
+                        str(hash(tuple(map(str, df.head(1).values.flatten().tolist()))))
+                        if len(df) > 0
+                        else "empty"
+                    )
+                except Exception:
+                    _sample_hash = "0"
                 ck = cache_key(
                     "profile",
                     str(df.shape),
                     ",".join(map(str, df.columns[:5])),
-                    str(id(df) % 100000),
+                    _sample_hash[:12],
                 )
             cached = cache_get(ck)
             if cached and isinstance(cached, dict):

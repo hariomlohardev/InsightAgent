@@ -89,7 +89,7 @@ def test_preview_apply_no_save_on_fail(tmp_path, monkeypatch):
     meta = {
         "id": did,
         "original_filename": "a.csv",
-        "created_at": datetime.datetime.utcnow().isoformat(),
+        "created_at": datetime.datetime.now(datetime.timezone.utc).isoformat(),
         "rows": 2,
         "columns": 1,
         "column_names": ["a"],

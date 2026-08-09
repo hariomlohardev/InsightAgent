@@ -1,6 +1,6 @@
 import uuid
 import json
-from datetime import datetime
+from datetime import timezone, datetime
 from pathlib import Path
 from fastapi import APIRouter, HTTPException
 from fastapi.responses import StreamingResponse
@@ -61,7 +61,7 @@ async def create_report(body: ReportCreate):
         if b.get("type") == "widget" and b.get("widget_id") not in widget_ids:
             raise HTTPException(status_code=400, detail=f"Widget {b['widget_id']} not in dashboard")
     rid = str(uuid.uuid4())[:8]
-    now = datetime.utcnow().isoformat()
+    now = datetime.now(timezone.utc).isoformat()
     report = {
         "id": rid,
         "dashboard_id": body.dashboard_id,

@@ -2,7 +2,7 @@ import uuid
 import json
 import shutil
 from pathlib import Path
-from datetime import datetime
+from datetime import timezone, datetime
 from typing import Dict, Any, List, Optional
 import pandas as pd
 
@@ -143,8 +143,8 @@ def create_connector(
         "table": table,
         "sheet_url": sheet_url,
         "credentials_json": credentials_json,
-        "created_at": datetime.utcnow().isoformat(),
-        "updated_at": datetime.utcnow().isoformat(),
+        "created_at": datetime.now(timezone.utc).isoformat(),
+        "updated_at": datetime.now(timezone.utc).isoformat(),
     }
     # For sqlite with sample_data demo: if dsn is sample_data path we can auto-setup?
     # But we rely on caller to have file.

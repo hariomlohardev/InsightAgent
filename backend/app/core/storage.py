@@ -6,7 +6,7 @@ import tempfile
 import time
 import threading
 from pathlib import Path
-from datetime import datetime
+from datetime import timezone, datetime
 from typing import List, Dict, Any, Optional
 import pandas as pd
 import logging
@@ -14,10 +14,14 @@ import logging
 logger = logging.getLogger(__name__)
 
 # --- DataFrame cache: dataset_id:version -> DataFrame (avoids re-read from disk) ---
+# Memory-aware LRU: 4 entries max but also 600MB cap to prevent 10M OOM (4×800MB would OOM)
 _DF_CACHE: Dict[str, pd.DataFrame] = {}
 _DF_CACHE_TS: Dict[str, float] = {}
+_DF_CACHE_BYTES: Dict[str, int] = {}
+_DF_CACHE_TOTAL_BYTES: int = 0
 _DF_CACHE_LOCK = threading.Lock()
 _DF_CACHE_MAX = 4  # avoid unbounded growth
+_DF_CACHE_MAX_BYTES = 600 * 1024 * 1024  # 600MB cap
 _DF_CACHE_TTL = 300  # seconds
 # --- list_datasets cache ---
 _LIST_CACHE: Dict[str, Any] = {"data": None, "ts": 0, "q": None}
@@ -29,14 +33,44 @@ def _df_cache_key(dataset_id: str, version: int, use_polars: bool) -> str:
     return f"{dataset_id}:{version}:{use_polars}"
 
 
+def _df_estimate_bytes(df: pd.DataFrame) -> int:
+    try:
+        # deep=True for object/string
+        return int(df.memory_usage(deep=True).sum())
+    except Exception:
+        try:
+            return int(df.shape[0] * df.shape[1] * 8)
+        except Exception:
+            return 10 * 1024 * 1024  # fallback 10MB
+
+
+def _df_cache_evict_if_needed():
+    global _DF_CACHE_TOTAL_BYTES
+    # Evict LRU until under both count and bytes limits
+    while (len(_DF_CACHE) > _DF_CACHE_MAX) or (
+        _DF_CACHE_TOTAL_BYTES > _DF_CACHE_MAX_BYTES and len(_DF_CACHE) > 1
+    ):
+        try:
+            oldest = min(_DF_CACHE_TS, key=lambda k: _DF_CACHE_TS[k])
+        except Exception:
+            break
+        _DF_CACHE_TOTAL_BYTES -= _DF_CACHE_BYTES.pop(oldest, 0)
+        _DF_CACHE.pop(oldest, None)
+        _DF_CACHE_TS.pop(oldest, None)
+
+
 def _invalidate_df_cache(dataset_id: str = None):
+    global _DF_CACHE_TOTAL_BYTES
     with _DF_CACHE_LOCK:
         if dataset_id is None:
             _DF_CACHE.clear()
             _DF_CACHE_TS.clear()
+            _DF_CACHE_BYTES.clear()
+            _DF_CACHE_TOTAL_BYTES = 0
         else:
             for k in list(_DF_CACHE.keys()):
                 if k.startswith(f"{dataset_id}:"):
+                    _DF_CACHE_TOTAL_BYTES -= _DF_CACHE_BYTES.pop(k, 0)
                     _DF_CACHE.pop(k, None)
                     _DF_CACHE_TS.pop(k, None)
 
@@ -124,9 +158,9 @@ def _db_save_meta(meta: Dict[str, Any]):
                 # parse created_at
                 ca = meta.get("created_at")
                 try:
-                    dt = _dt.fromisoformat(ca) if ca else _dt.utcnow()
+                    dt = _dt.fromisoformat(ca) if ca else _dt.now(timezone.utc)
                 except:
-                    dt = _dt.utcnow()
+                    dt = _dt.now(timezone.utc)
                 row = DatasetRow(
                     id=meta["id"],
                     workspace_id=meta.get("workspace_id", "default"),
@@ -441,7 +475,7 @@ def save_dataset(file_path: Path, original_filename: str) -> str:
     meta = {
         "id": dataset_id,
         "original_filename": original_filename,
-        "created_at": datetime.utcnow().isoformat(),
+        "created_at": datetime.now(timezone.utc).isoformat(),
         "rows": int(rows),
         "columns": int(cols),
         "column_names": [str(c) for c in preview_cols],
@@ -700,6 +734,7 @@ def get_dataset_path(dataset_id: str) -> Optional[Path]:
 
 
 def load_dataset_df(dataset_id: str, use_polars: bool = None) -> pd.DataFrame:
+    global _DF_CACHE_TOTAL_BYTES
     # cache check — stable key dataset_id:version (not id(df))
     # determine version early for cache key
     try:
@@ -801,15 +836,14 @@ def load_dataset_df(dataset_id: str, use_polars: bool = None) -> pd.DataFrame:
                         pass
                 if _polars_df is not None:
                     with _DF_CACHE_LOCK:
-                        if len(_DF_CACHE) >= _DF_CACHE_MAX:
-                            oldest = min(_DF_CACHE_TS, key=lambda k: _DF_CACHE_TS[k])
-                            _DF_CACHE.pop(oldest, None)
-                            _DF_CACHE_TS.pop(oldest, None)
+                        # memory-aware eviction
+                        b = _df_estimate_bytes(_polars_df)
                         _DF_CACHE[_ck] = _polars_df
                         _DF_CACHE_TS[_ck] = time.time()
-                    return (
-                        _polars_df.copy(deep=False) if hasattr(_polars_df, "copy") else _polars_df
-                    )
+                        _DF_CACHE_BYTES[_ck] = b
+                        _DF_CACHE_TOTAL_BYTES += b
+                        _df_cache_evict_if_needed()
+                    return _polars_df.copy(deep=True) if hasattr(_polars_df, "copy") else _polars_df
             try:
                 df_pl = pl.scan_csv(str(p), infer_schema_length=1000, try_parse_dates=True).collect(
                     streaming=True
@@ -833,13 +867,13 @@ def load_dataset_df(dataset_id: str, use_polars: bool = None) -> pd.DataFrame:
                         pass
             if _polars_df is not None:
                 with _DF_CACHE_LOCK:
-                    if len(_DF_CACHE) >= _DF_CACHE_MAX:
-                        oldest = min(_DF_CACHE_TS, key=lambda k: _DF_CACHE_TS[k])
-                        _DF_CACHE.pop(oldest, None)
-                        _DF_CACHE_TS.pop(oldest, None)
+                    b = _df_estimate_bytes(_polars_df)
                     _DF_CACHE[_ck] = _polars_df
                     _DF_CACHE_TS[_ck] = time.time()
-                return _polars_df.copy(deep=False) if hasattr(_polars_df, "copy") else _polars_df
+                    _DF_CACHE_BYTES[_ck] = b
+                    _DF_CACHE_TOTAL_BYTES += b
+                    _df_cache_evict_if_needed()
+                return _polars_df.copy(deep=True) if hasattr(_polars_df, "copy") else _polars_df
         except ImportError:
             pass
     # Fallback pandas with chunked sample for huge files (avoid OOM)
@@ -868,17 +902,16 @@ def load_dataset_df(dataset_id: str, use_polars: bool = None) -> pd.DataFrame:
             _df = pd.read_excel(orig_xls)
         else:
             raise
-    # store in cache (dataset_id:version -> df)
+    # store in cache (dataset_id:version -> df) — memory-aware
     if _df is not None:
         try:
             with _DF_CACHE_LOCK:
-                # evict oldest if max reached
-                if len(_DF_CACHE) >= _DF_CACHE_MAX:
-                    oldest = min(_DF_CACHE_TS, key=lambda k: _DF_CACHE_TS[k])
-                    _DF_CACHE.pop(oldest, None)
-                    _DF_CACHE_TS.pop(oldest, None)
+                b = _df_estimate_bytes(_df)
                 _DF_CACHE[_ck] = _df
                 _DF_CACHE_TS[_ck] = time.time()
+                _DF_CACHE_BYTES[_ck] = b
+                _DF_CACHE_TOTAL_BYTES += b
+                _df_cache_evict_if_needed()
         except Exception:
             pass
     return _df
@@ -983,19 +1016,19 @@ def save_conversation_message(
             conv = {
                 "id": conversation_id,
                 "dataset_id": dataset_id,
-                "created_at": datetime.utcnow().isoformat(),
+                "created_at": datetime.now(timezone.utc).isoformat(),
                 "messages": [],
             }
     else:
         conv = {
             "id": conversation_id,
             "dataset_id": dataset_id,
-            "created_at": datetime.utcnow().isoformat(),
+            "created_at": datetime.now(timezone.utc).isoformat(),
             "messages": [],
         }
-    msg = {"role": role, "timestamp": datetime.utcnow().isoformat(), **content}
+    msg = {"role": role, "timestamp": datetime.now(timezone.utc).isoformat(), **content}
     conv["messages"].append(msg)
-    conv["updated_at"] = datetime.utcnow().isoformat()
+    conv["updated_at"] = datetime.now(timezone.utc).isoformat()
     conv["dataset_id"] = dataset_id  # ensure
 
     def _default(o):
@@ -1123,7 +1156,7 @@ def create_version(dataset_id: str, df: pd.DataFrame, op: str, prompt: str, code
         "op": op,
         "prompt": prompt[:200],
         "code": code[:1000],
-        "created_at": datetime.utcnow().isoformat(),
+        "created_at": datetime.now(timezone.utc).isoformat(),
         "rows": int(df.shape[0]),
         "columns": int(df.shape[1]),
     }

@@ -1,7 +1,7 @@
 import uuid
 import secrets
 from typing import Dict, Any, List, Optional
-from datetime import datetime
+from datetime import timezone, datetime
 from pathlib import Path
 import json
 
@@ -51,8 +51,8 @@ def create_dashboard(dataset_id: str, name: str, description: str = "") -> Dict[
         "dataset_id": dataset_id,
         "name": name[:100] if name else f"Dashboard {dash_id}",
         "description": description[:500] if description else "",
-        "created_at": datetime.utcnow().isoformat(),
-        "updated_at": datetime.utcnow().isoformat(),
+        "created_at": datetime.now(timezone.utc).isoformat(),
+        "updated_at": datetime.now(timezone.utc).isoformat(),
         "is_public": False,
         "share_slug": None,
         "widgets": [],
@@ -110,11 +110,11 @@ def add_widget(dash_id: str, widget_data: Dict[str, Any]) -> Dict[str, Any]:
         "result": widget_data.get("result"),
         "chart": widget_data.get("chart"),
         "title": widget_data.get("title", widget_data.get("query", "")[:60])[:100],
-        "created_at": datetime.utcnow().isoformat(),
+        "created_at": datetime.now(timezone.utc).isoformat(),
         "dataset_version": dataset_version,
     }
     dash["widgets"].append(widget)
-    dash["updated_at"] = datetime.utcnow().isoformat()
+    dash["updated_at"] = datetime.now(timezone.utc).isoformat()
     _atomic_write_json(_dashboard_path(dash_id), dash)
     return widget
 
@@ -127,7 +127,7 @@ def remove_widget(dash_id: str, widget_id: str) -> bool:
     dash["widgets"] = [w for w in dash["widgets"] if w["id"] != widget_id]
     if len(dash["widgets"]) == before:
         return False
-    dash["updated_at"] = datetime.utcnow().isoformat()
+    dash["updated_at"] = datetime.now(timezone.utc).isoformat()
     _atomic_write_json(_dashboard_path(dash_id), dash)
     return True
 
@@ -158,8 +158,8 @@ def refresh_widget(dash_id: str, widget_id: str) -> Optional[Dict[str, Any]]:
     # Update version
     meta = storage.get_dataset_meta(dash["dataset_id"])
     widget["dataset_version"] = meta.get("current_version", 0) if meta else 0
-    widget["updated_at"] = datetime.utcnow().isoformat()
-    dash["updated_at"] = datetime.utcnow().isoformat()
+    widget["updated_at"] = datetime.now(timezone.utc).isoformat()
+    dash["updated_at"] = datetime.now(timezone.utc).isoformat()
     _atomic_write_json(_dashboard_path(dash_id), dash)
     return widget
 
@@ -177,7 +177,7 @@ def share_dashboard(dash_id: str) -> Dict[str, Any]:
     slug = generate_slug()
     dash["is_public"] = True
     dash["share_slug"] = slug
-    dash["updated_at"] = datetime.utcnow().isoformat()
+    dash["updated_at"] = datetime.now(timezone.utc).isoformat()
     _atomic_write_json(_dashboard_path(dash_id), dash)
     return {"slug": slug, "is_public": True, "url": f"/api/dashboards/share/{slug}"}
 
@@ -188,7 +188,7 @@ def unshare_dashboard(dash_id: str) -> Dict[str, Any]:
         raise FileNotFoundError(f"Dashboard {dash_id} not found")
     dash["is_public"] = False
     # Keep slug for potential re-share, but could clear
-    dash["updated_at"] = datetime.utcnow().isoformat()
+    dash["updated_at"] = datetime.now(timezone.utc).isoformat()
     _atomic_write_json(_dashboard_path(dash_id), dash)
     return {"is_public": False, "slug": dash.get("share_slug")}
 

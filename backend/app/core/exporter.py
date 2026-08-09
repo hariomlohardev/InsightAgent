@@ -83,7 +83,7 @@ def dashboard_to_pdf(dashboard: Dict[str, Any], share_url: Optional[str] = None)
 
     story.append(
         Paragraph(
-            f"Dataset {dashboard.get('dataset_id','')} • {len(dashboard.get('widgets',[]))} widgets • {datetime.datetime.utcnow().strftime('%Y-%m-%d %H:%M UTC')}",
+            f"Dataset {dashboard.get('dataset_id','')} • {len(dashboard.get('widgets',[]))} widgets • {datetime.datetime.now(datetime.timezone.utc).strftime('%Y-%m-%d %H:%M UTC')}",
             subtitle_style,
         )
     )
@@ -271,7 +271,7 @@ def report_to_pdf(
         story.append(Paragraph(report["description"], small_style))
     story.append(
         Paragraph(
-            f"{datetime.datetime.utcnow().strftime('%Y-%m-%d %H:%M UTC')} • {len(report.get('blocks',[]))} blocks",
+            f"{datetime.datetime.now(datetime.timezone.utc).strftime('%Y-%m-%d %H:%M UTC')} • {len(report.get('blocks',[]))} blocks",
             small_style,
         )
     )

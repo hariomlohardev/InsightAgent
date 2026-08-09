@@ -297,14 +297,14 @@ async def add_comment(
         "user": user.get("email") if user.get("id") != "anon" else (body.user or "anon")[:50],
         "text": body.text.strip()[:1000],
         "parent_id": body.parent_id,
-        "created_at": datetime.datetime.utcnow().isoformat(),
+        "created_at": datetime.datetime.now(datetime.timezone.utc).isoformat(),
     }
     comments = dash.get("comments", [])
     if len(comments) >= 100:
         raise HTTPException(status_code=400, detail="Too many comments (max 100)")
     comments.append(comment)
     dash["comments"] = comments
-    dash["updated_at"] = datetime.datetime.utcnow().isoformat()
+    dash["updated_at"] = datetime.datetime.now(datetime.timezone.utc).isoformat()
     # Persist
     from pathlib import Path
     from app.config import get_storage_path
@@ -343,7 +343,7 @@ async def delete_comment(dash_id: str, cid: str):
     dash["comments"] = comments
     import datetime
 
-    dash["updated_at"] = datetime.datetime.utcnow().isoformat()
+    dash["updated_at"] = datetime.datetime.now(datetime.timezone.utc).isoformat()
     from app.config import get_storage_path
     from app.core.storage import _atomic_write_json
 
