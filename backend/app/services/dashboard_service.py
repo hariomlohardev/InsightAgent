@@ -33,7 +33,7 @@ def generate_slug() -> str:
                     data = json.load(jf)
                     if data.get("share_slug"):
                         slugs.add(data["share_slug"])
-            except:
+            except Exception:
                 continue
         if slug not in slugs:
             return slug
@@ -80,7 +80,7 @@ def list_dashboards(dataset_id: Optional[str] = None) -> List[Dict[str, Any]]:
                 data = json.load(jf)
                 if dataset_id is None or data.get("dataset_id") == dataset_id:
                     dashboards.append(data)
-        except:
+        except Exception:
             continue
     dashboards.sort(key=lambda x: x.get("updated_at", x.get("created_at", "")), reverse=True)
     return dashboards
@@ -200,7 +200,7 @@ def get_by_slug(slug: str) -> Optional[Dict[str, Any]]:
                 data = json.load(jf)
                 if data.get("share_slug") == slug and data.get("is_public"):
                     return data
-        except:
+        except Exception:
             continue
     return None
 

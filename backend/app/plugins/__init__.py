@@ -112,6 +112,6 @@ def get_analyzer(name: str) -> Optional[BaseAnalyzer]:
             for ep in eps.get("insightagent.analyzers", []):
                 if ep.name == name:
                     return ep.load()()
-    except:
+    except Exception:
         pass
     return None

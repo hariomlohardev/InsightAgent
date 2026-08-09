@@ -36,7 +36,7 @@ def fallback_explain(
             try:
                 fv = float(str(v).replace(",", ""))
                 numeric_vals.append((k, fv, first))
-            except:
+            except Exception:
                 pass
         if numeric_vals:
             # Find max in data if grouped

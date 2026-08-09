@@ -14,14 +14,14 @@ def diff_dataframes(before: pd.DataFrame, after: pd.DataFrame) -> Dict[str, Any]
         try:
             nulls_before = int(before.isna().sum().sum())
             nulls_after = int(after.isna().sum().sum())
-        except:
+        except Exception:
             nulls_before = nulls_after = 0
 
         # Duplicates
         try:
             dups_before = int(before.duplicated().sum())
             dups_after = int(after.duplicated().sum())
-        except:
+        except Exception:
             dups_before = dups_after = 0
 
         # Dtypes changed
@@ -33,7 +33,7 @@ def diff_dataframes(before: pd.DataFrame, after: pd.DataFrame) -> Dict[str, Any]
                 for c in set(list(dtypes_before.keys()) + list(dtypes_after.keys()))
                 if dtypes_before.get(c) != dtypes_after.get(c)
             }
-        except:
+        except Exception:
             dtypes_changed = {}
 
         # Columns added/removed

@@ -32,7 +32,7 @@ async def cloud_register(body: CloudRegisterRequest, request: Request):
         from app.config import set_workspace_id
 
         set_workspace_id(ws_id)
-    except:
+    except Exception:
         pass
     try:
         user = auth_core.create_user(
@@ -51,7 +51,7 @@ async def cloud_register(body: CloudRegisterRequest, request: Request):
             from app.core.storage import _atomic_write_json
 
             _atomic_write_json(meta_p, meta)
-    except:
+    except Exception:
         pass
     token = auth_core.create_jwt(user)
     # Mock email verification: just return

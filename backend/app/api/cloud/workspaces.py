@@ -43,7 +43,7 @@ async def get_brand(ws_id: str, user=Depends(get_current_user)):
         with open(p) as f:
             data = json.load(f)
         return data
-    except:
+    except Exception:
         return {
             "workspace_id": ws_id,
             "app_name": "InsightAgent",
@@ -79,7 +79,7 @@ async def set_brand(
                     raise HTTPException(status_code=402, detail="Brand requires enterprise plan")
     except HTTPException:
         raise
-    except:
+    except Exception:
         pass
     data = {
         "workspace_id": ws_id,

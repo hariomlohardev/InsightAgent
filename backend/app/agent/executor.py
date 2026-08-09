@@ -86,7 +86,7 @@ def dataframe_to_json(df: pd.DataFrame, max_rows: int = 100) -> Dict[str, Any]:
             else:
                 try:
                     json.dumps(v)
-                except:
+                except Exception:
                     rec[k] = str(v)
 
     return {
@@ -216,7 +216,7 @@ def execute_code(code: str, df: pd.DataFrame, timeout: int = None) -> Dict[str, 
             try:
                 tmp = pd.DataFrame([result])
                 result_json = dataframe_to_json(tmp)
-            except:
+            except Exception:
                 result_json = {
                     "columns": ["value"],
                     "data": [{"value": str(result)}],
@@ -229,7 +229,7 @@ def execute_code(code: str, df: pd.DataFrame, timeout: int = None) -> Dict[str, 
             try:
                 tmp = pd.DataFrame(result)
                 result_json = dataframe_to_json(tmp)
-            except:
+            except Exception:
                 result_json = {
                     "columns": ["value"],
                     "data": [{"value": str(v)} for v in result[:100]],
@@ -257,7 +257,7 @@ def execute_code(code: str, df: pd.DataFrame, timeout: int = None) -> Dict[str, 
         elif isinstance(result, pd.Series):
             try:
                 _after = result.to_frame()
-            except:
+            except Exception:
                 pass
 
         return {

@@ -49,7 +49,7 @@ def get_current_user(
                         from app.config import set_workspace_id
 
                         set_workspace_id(user.get("workspace_id") or "default")
-                    except:
+                    except Exception:
                         pass
                 return user
         # invalid key
@@ -76,7 +76,7 @@ def get_current_user(
 
                 ws = data.get("ws_id") or user.get("workspace_id") or "default"
                 set_workspace_id(ws)
-            except:
+            except Exception:
                 pass
         # Return fresh user with role
         return user
@@ -90,7 +90,7 @@ def get_current_user(
             from app.config import set_workspace_id
 
             set_workspace_id(anon_ws)
-        except:
+        except Exception:
             pass
     return {
         "id": "anon",
@@ -118,7 +118,7 @@ def require_role(*roles):
 # Seed admin on first import
 try:
     auth_core.seed_admin()
-except:
+except Exception:
     pass
 
 

@@ -48,12 +48,12 @@ def log(
                 if now - p.stat().st_mtime > 30 * 86400:
                     try:
                         p.unlink()
-                    except:
+                    except Exception:
                         pass
-        except:
+        except Exception:
             pass
         return entry
-    except:
+    except Exception:
         return None
 
 
@@ -78,9 +78,9 @@ def list_audit(
                         if user_email and e.get("user") != user_email:
                             continue
                         entries.append(e)
-                    except:
+                    except Exception:
                         continue
-        except:
+        except Exception:
             continue
         if len(entries) >= limit:
             break

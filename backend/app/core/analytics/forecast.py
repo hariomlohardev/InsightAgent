@@ -17,7 +17,7 @@ def _find_date_col(df: pd.DataFrame) -> Optional[str]:
                 continue
             pd.to_datetime(sample, errors="raise")
             return c
-        except:
+        except Exception:
             continue
     return None
 
@@ -30,7 +30,7 @@ def _find_metric(df: pd.DataFrame, metric: Optional[str], profile: Dict[str, Any
         try:
             pd.to_numeric(df[metric].dropna().head(3), errors="raise")
             return metric
-        except:
+        except Exception:
             pass
     if profile and profile.get("numeric_columns"):
         return profile["numeric_columns"][0]
@@ -52,7 +52,7 @@ def _resample_ts(df: pd.DataFrame, date_col: str, metric: str, freq: str = "M") 
     # If metric not numeric, sum count
     try:
         df_copy[metric] = pd.to_numeric(df_copy[metric], errors="coerce")
-    except:
+    except Exception:
         pass
     # Resample
     freq_map = {"D": "D", "W": "W", "M": "ME", "ME": "ME", "MS": "MS", "Q": "QE", "QE": "QE"}

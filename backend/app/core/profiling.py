@@ -53,7 +53,7 @@ def profile_dataframe(
                     return cached
                 elif "column_names" in cached and "inferred_roles" in cached:
                     return cached
-        except:
+        except Exception:
             pass
     # Guard empty df
     if df is None or df.shape[1] == 0:
@@ -276,7 +276,7 @@ def profile_dataframe(
                         import json
 
                         json.dumps(v)
-                    except:
+                    except Exception:
                         row[k] = str(v)
     except Exception:
         sample_rows = []
@@ -314,7 +314,7 @@ def profile_dataframe(
                 f"DEBUG_PROFILE profile_dataframe rows={rows} cols={cols} total_ms={total_ms:.1f}",
                 file=sys.stderr,
             )
-        except:
+        except Exception:
             pass
     if use_cache:
         try:
@@ -327,7 +327,7 @@ def profile_dataframe(
                     "profile", str(result["shape"]), ",".join(map(str, result["column_names"][:5]))
                 )
             cache_set(ck, result, ttl=60)
-        except:
+        except Exception:
             pass
     return result
 
@@ -349,7 +349,7 @@ def get_profile_summary_text(profile: Dict[str, Any]) -> str:
             if s["mean"] is not None:
                 try:
                     line += f", stats(mean={s['mean']:.2f} min={s['min']} max={s['max']})"
-                except:
+                except Exception:
                     pass
         if "top_values" in col:
             line += f", top={col['top_values']}"

@@ -144,7 +144,7 @@ def _db_save_meta(meta: Dict[str, Any]):
             if existing is None:
                 try:
                     existing = s.get(DatasetRow, meta["id"])
-                except:
+                except Exception:
                     existing = None
             if existing:
                 existing.workspace_id = meta.get("workspace_id", "default")
@@ -159,7 +159,7 @@ def _db_save_meta(meta: Dict[str, Any]):
                 ca = meta.get("created_at")
                 try:
                     dt = _dt.fromisoformat(ca) if ca else _dt.now(timezone.utc)
-                except:
+                except Exception:
                     dt = _dt.now(timezone.utc)
                 row = DatasetRow(
                     id=meta["id"],
@@ -638,7 +638,7 @@ def list_datasets(q: str = None) -> List[Dict[str, Any]]:
                                 ):
                                     fs_metas.append(data)
                                     fs_ids.add(data.get("id"))
-                            except:
+                            except Exception:
                                 continue
                 db_ids = {m.get("id") for m in db_metas}
                 for m in fs_metas:
@@ -796,7 +796,7 @@ def load_dataset_df(dataset_id: str, use_polars: bool = None) -> pd.DataFrame:
             if p_fallback.exists():
                 try:
                     return pd.read_csv(p_fallback)
-                except:
+                except Exception:
                     pass
             raise
     p = get_dataset_path(dataset_id)
@@ -817,7 +817,7 @@ def load_dataset_df(dataset_id: str, use_polars: bool = None) -> pd.DataFrame:
                     _meta = get_dataset_meta(dataset_id)
                     if _meta and _meta.get("rows", 0) > 100_000:
                         use_polars = True
-        except:
+        except Exception:
             pass
     if use_polars:
         _polars_df = None
@@ -863,7 +863,7 @@ def load_dataset_df(dataset_id: str, use_polars: bool = None) -> pd.DataFrame:
                     try:
                         df_pl = pl.read_csv(str(p), try_parse_dates=True, infer_schema_length=1000)
                         _polars_df = df_pl.to_pandas()
-                    except:
+                    except Exception:
                         pass
             if _polars_df is not None:
                 with _DF_CACHE_LOCK:
@@ -933,7 +933,7 @@ def delete_dataset(dataset_id: str) -> bool:
             # meta
             try:
                 fs.rm(f"s3://{bucket}/datasets/{dataset_id}/meta.json")
-            except:
+            except Exception:
                 pass
         except Exception as e:
             logger.debug(f"S3 delete failed: {e}")
@@ -947,9 +947,9 @@ def delete_dataset(dataset_id: str) -> bool:
                 c_path = _gsp() / "connectors" / f"{dataset_id}.json"
                 if c_path.exists():
                     c_path.unlink()
-            except:
+            except Exception:
                 pass
-    except:
+    except Exception:
         pass
     d = _datasets_dir() / dataset_id
     existed = d.exists()
@@ -966,9 +966,9 @@ def delete_dataset(dataset_id: str) -> bool:
         for v in range(20):
             try:
                 cache_delete(cache_key(f"profile:{dataset_id}:{v}"))
-            except:
+            except Exception:
                 pass
-    except:
+    except Exception:
         pass
     if d.exists():
         try:
@@ -984,11 +984,11 @@ def delete_dataset(dataset_id: str) -> bool:
                     for f in files:
                         try:
                             os.chmod(os.path.join(root, f), stat.S_IWUSR | stat.S_IRUSR)
-                        except:
+                        except Exception:
                             pass
                 shutil.rmtree(d)
                 return True
-            except:
+            except Exception:
                 return bool(db_res)
     # If DB deleted and fs didn't exist, still success
     if db_res:
@@ -1074,7 +1074,7 @@ def get_conversation(conversation_id: str) -> Optional[Dict[str, Any]]:
     except json.JSONDecodeError:
         try:
             f.unlink()
-        except:
+        except Exception:
             pass
         return None
 
@@ -1090,7 +1090,7 @@ def list_conversations(
         except json.JSONDecodeError:
             try:
                 f.unlink()
-            except:
+            except Exception:
                 pass
             continue
         except Exception:
@@ -1118,7 +1118,7 @@ def list_versions(dataset_id: str) -> List[Dict[str, Any]]:
     try:
         with open(vfile) as f:
             return json.load(f)
-    except:
+    except Exception:
         return []
 
 
@@ -1177,7 +1177,7 @@ def create_version(dataset_id: str, df: pd.DataFrame, op: str, prompt: str, code
                 ver = int(f.stem)
                 if ver not in keep_versions:
                     f.unlink()
-            except:
+            except Exception:
                 pass
 
     _atomic_write_json(vfile, versions)
@@ -1199,20 +1199,20 @@ def create_version(dataset_id: str, df: pd.DataFrame, op: str, prompt: str, code
             for v in [next_version, next_version - 1]:
                 try:
                     cache_delete(cache_key(f"profile:{dataset_id}:{v}"))
-                except:
+                except Exception:
                     pass
             # also chat cache: chat:{id}:*:*
             # leave chat cache to expire via ttl (60s) or version key already isolates
-        except:
+        except Exception:
             pass
         # update parquet cache for fast re-read
         try:
             if int(df.shape[0]) > 100_000:
                 try:
                     df.to_parquet(dest_dir / "data.parquet", index=False)
-                except:
+                except Exception:
                     pass
-        except:
+        except Exception:
             pass
 
     return next_version
@@ -1255,8 +1255,8 @@ def revert_to_version(dataset_id: str, version: int) -> bool:
             for v in range(20):
                 try:
                     cache_delete(cache_key(f"profile:{dataset_id}:{v}"))
-                except:
+                except Exception:
                     pass
-        except:
+        except Exception:
             pass
     return True

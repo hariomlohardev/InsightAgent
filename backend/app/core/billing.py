@@ -58,10 +58,10 @@ def get_billing(ws_id: str = None) -> Dict[str, Any]:
                 data["queries_this_month"] = 0
                 data["last_reset"] = now.isoformat()
                 _atomic_write_json(p, data)
-        except:
+        except Exception:
             pass
         return data
-    except:
+    except Exception:
         return {"plan": "free", "queries_this_month": 0}
 
 
@@ -82,7 +82,7 @@ def set_plan(ws_id: str, plan: str, stripe_customer_id: str = None, status: str 
                 meta = json.load(f)
             meta["plan"] = plan
             _atomic_write_json(meta_p, meta)
-    except:
+    except Exception:
         pass
     return billing
 

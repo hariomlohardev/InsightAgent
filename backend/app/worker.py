@@ -43,7 +43,7 @@ def _save_job(job_id: str, payload: dict):
             from app.core.cache import set as cache_set
 
             cache_set(f"job:{job_id}", payload, ttl=600)
-        except:
+        except Exception:
             pass
     except Exception as e:
         import traceback

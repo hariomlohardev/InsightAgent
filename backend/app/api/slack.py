@@ -17,7 +17,7 @@ def verify_slack_signature(
         ts = int(timestamp)
         if abs(time.time() - ts) > 60 * 5:
             return False
-    except:
+    except Exception:
         return False
     basestring = f"v0:{timestamp}:{body.decode('utf-8', errors='ignore')}"
     my_sig = (
@@ -38,7 +38,7 @@ async def slack_events(
 
     try:
         data = json.loads(body.decode() or "{}")
-    except:
+    except Exception:
         data = {}
     # URL verification challenge
     if data.get("type") == "url_verification":
@@ -92,7 +92,7 @@ async def slack_events(
                 user = form.get("user_id", [""])[0]
             else:
                 return {"status": "no event"}
-        except:
+        except Exception:
             return {"status": "no event"}
     if not text:
         return {"status": "no text"}
@@ -131,7 +131,7 @@ async def slack_events(
 
                 df = pd.DataFrame(res["data"][:5])
                 reply_text += "\n\n```\n" + df.to_string(index=False) + "\n```"
-            except:
+            except Exception:
                 pass
         # Send to Slack via bot token if available, else return in response (for testing)
         bot_token = os.getenv("SLACK_BOT_TOKEN")

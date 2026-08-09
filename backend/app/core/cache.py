@@ -41,10 +41,10 @@ def get(key: str) -> Optional[Any]:
             if val is not None:
                 try:
                     return json.loads(val)
-                except:
+                except Exception:
                     return val
             return None
-        except:
+        except Exception:
             pass
     # memory fallback
     if key in _memory_cache:
@@ -66,11 +66,11 @@ def set(key: str, value: Any, ttl: int = None):
             # json serialize
             try:
                 s = json.dumps(value)
-            except:
+            except Exception:
                 s = json.dumps(str(value))
             r.setex(key, ttl, s)
             return
-        except:
+        except Exception:
             pass
     # memory
     _memory_cache[key] = value
@@ -88,7 +88,7 @@ def clear_prefix(prefix: str):
         try:
             for k in r.scan_iter(match=prefix + "*"):
                 r.delete(k)
-        except:
+        except Exception:
             pass
     # memory
     for k in list(_memory_cache.keys()):
@@ -102,7 +102,7 @@ def delete(key: str):
     if r:
         try:
             r.delete(key)
-        except:
+        except Exception:
             pass
     _memory_cache.pop(key, None)
     _memory_times.pop(key, None)
@@ -113,7 +113,7 @@ def clear():
     if r:
         try:
             r.flushdb()
-        except:
+        except Exception:
             pass
     _memory_cache.clear()
     _memory_times.clear()

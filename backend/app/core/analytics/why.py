@@ -21,7 +21,7 @@ def _find_date_col(df: pd.DataFrame) -> Optional[str]:
                 continue
             pd.to_datetime(sample, errors="raise")
             return c
-        except:
+        except Exception:
             continue
     return None
 
@@ -96,7 +96,7 @@ def _find_period(
             # For comparison, pre is previous month
             # Return month as period key
             return period_str, date_col
-        except:
+        except Exception:
             pass
     # Check for generic "last month" or "in march"
     if month:
@@ -150,7 +150,7 @@ def analyze_why(df: pd.DataFrame, profile: Dict[str, Any], query: str) -> pd.Dat
     # Ensure metric numeric
     try:
         df_copy[metric] = pd.to_numeric(df_copy[metric], errors="coerce").fillna(0)
-    except:
+    except Exception:
         pass
 
     # If date_col present, parse
@@ -159,7 +159,7 @@ def analyze_why(df: pd.DataFrame, profile: Dict[str, Any], query: str) -> pd.Dat
             df_copy["_parsed_date"] = pd.to_datetime(df_copy[date_col], errors="coerce")
             df_copy["_month"] = df_copy["_parsed_date"].dt.month
             df_copy["_year"] = df_copy["_parsed_date"].dt.year
-        except:
+        except Exception:
             date_col = None
 
     pre = None
@@ -186,7 +186,7 @@ def analyze_why(df: pd.DataFrame, profile: Dict[str, Any], query: str) -> pd.Dat
                     post = df_copy[post_mask]
                     pre = df_copy[pre_mask] if pre_mask.sum() > 0 else df_copy[~post_mask]
                     period_label = f"month {month_num} vs prior"
-        except:
+        except Exception:
             pass
 
     # Fallback: if no time split, split by median of metric? No — use cohort diff by segment_col overall deltas vs overall?
@@ -287,7 +287,7 @@ def what_if(
         try:
             before_val = pd.to_numeric(df_before[metric], errors="coerce").sum()
             after_val = pd.to_numeric(df_after[metric], errors="coerce").sum()
-        except:
+        except Exception:
             before_val = 0
             after_val = 0
         delta = after_val - before_val

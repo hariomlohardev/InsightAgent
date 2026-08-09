@@ -102,7 +102,7 @@ async def webhook(request: Request):
                 # for mock tests, fallback to json parse
                 try:
                     event = _j.loads(payload.decode() if isinstance(payload, bytes) else payload)
-                except:
+                except Exception:
                     event = {}
         else:
             # mock: parse json
@@ -110,14 +110,14 @@ async def webhook(request: Request):
 
             try:
                 event = _j.loads(payload.decode() if isinstance(payload, bytes) else payload)
-            except:
+            except Exception:
                 event = {}
     except ImportError:
         import json as _j
 
         try:
             event = _j.loads(payload.decode() if isinstance(payload, bytes) else payload)
-        except:
+        except Exception:
             event = {}
     # event can be dict with type
     etype = event.get("type") if isinstance(event, dict) else getattr(event, "type", "")
@@ -159,6 +159,6 @@ async def portal(request: Request, user=Depends(get_current_user)):
                 customer=billing["stripe_customer_id"], return_url=str(request.base_url)
             )
             return {"url": session.url}
-        except:
+        except Exception:
             pass
     return {"url": f"/billing/portal/mock/{ws_id}"}

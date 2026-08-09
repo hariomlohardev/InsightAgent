@@ -16,7 +16,7 @@ async def preview_clean(dataset_id: str, query: str) -> Dict[str, Any]:
     try:
         _meta = storage.get_dataset_meta(dataset_id)
         _ver = _meta.get("current_version", 0) if _meta else 0
-    except:
+    except Exception:
         _ver = 0
     profile = await asyncio.to_thread(profile_dataframe, df, 5, True, dataset_id, _ver)
 
@@ -118,7 +118,7 @@ async def apply_clean(dataset_id: str, query: str, code: str = None) -> Dict[str
     try:
         _meta2 = storage.get_dataset_meta(dataset_id)
         _ver2 = _meta2.get("current_version", 0) if _meta2 else 0
-    except:
+    except Exception:
         _ver2 = 0
     profile = await asyncio.to_thread(profile_dataframe, df, 5, True, dataset_id, _ver2)
 
@@ -189,7 +189,7 @@ async def apply_clean(dataset_id: str, query: str, code: str = None) -> Dict[str
     try:
         _meta_n = storage.get_dataset_meta(dataset_id)
         _ver_n = _meta_n.get("current_version", 0) if _meta_n else 0
-    except:
+    except Exception:
         _ver_n = 0
     new_profile = await asyncio.to_thread(profile_dataframe, after_df, 5, True, dataset_id, _ver_n)
 

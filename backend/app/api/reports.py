@@ -86,7 +86,7 @@ async def list_reports(dashboard_id: Optional[str] = None):
                 data = _j.load(jf)
                 if dashboard_id is None or data.get("dashboard_id") == dashboard_id:
                     out.append(data)
-        except:
+        except Exception:
             continue
     out.sort(key=lambda x: x.get("created_at", ""), reverse=True)
     return out
@@ -102,7 +102,7 @@ async def get_report(rid: str):
 
         with open(p) as f:
             return _j.load(f)
-    except:
+    except Exception:
         raise HTTPException(status_code=500, detail="Failed to load report")
 
 
@@ -155,10 +155,10 @@ async def export_report(rid: str, format: str = "pdf"):
                                     if isinstance(res["data"][0], list)
                                     else pd.DataFrame(res["data"])
                                 )
-                            except:
+                            except Exception:
                                 try:
                                     df = pd.DataFrame(res["data"])
-                                except:
+                                except Exception:
                                     continue
                             csv_buf = io.StringIO()
                             df.to_csv(csv_buf, index=False)

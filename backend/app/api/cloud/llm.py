@@ -42,7 +42,7 @@ async def get_llm(user=Depends(get_current_user)):
         if data.get("openai_key"):
             data["openai_key"] = "***"
         return data
-    except:
+    except Exception:
         return {"provider": "auto"}
 
 
@@ -99,7 +99,7 @@ async def set_llm(body: LLMSetRequest, request: Request, user=Depends(get_curren
                 if old.get("openai_key") or old.get("openai_key_enc"):
                     data["openai_key"] = old.get("openai_key")
                     data["openai_key_enc"] = old.get("openai_key_enc")
-            except:
+            except Exception:
                 pass
     _atomic_write_json(_llm_path(ws_id), data)
     # return without key
@@ -119,7 +119,7 @@ async def test_llm(request: Request, user=Depends(get_current_user)):
         try:
             with open(p) as f:
                 cfg = json.load(f)
-        except:
+        except Exception:
             pass
     provider = cfg.get("provider", "auto")
     if provider == "ollama":

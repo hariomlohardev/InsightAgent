@@ -46,7 +46,7 @@ async def chat(
                 raise HTTPException(status_code=402, detail=msg)
     except HTTPException:
         raise
-    except:
+    except Exception:
         pass
     meta = storage.get_dataset_meta(req.dataset_id)
     if not meta:
@@ -82,7 +82,7 @@ async def chat(
                         "query": req.query,
                     },
                 )
-            except:
+            except Exception:
                 pass
             try:
                 run_chat_task.delay(job_id, req.dataset_id, req.query)
@@ -94,7 +94,7 @@ async def chat(
                         from app.core.billing import increment_query
 
                         increment_query(user.get("workspace_id") or "default")
-                except:
+                except Exception:
                     pass
                 return ChatResponse(**result)
             from fastapi.responses import JSONResponse
@@ -125,7 +125,7 @@ async def chat(
                 from app.core.billing import increment_query
 
                 increment_query(user.get("workspace_id") or "default")
-        except:
+        except Exception:
             pass
         return ChatResponse(**result)
     except FileNotFoundError as e:

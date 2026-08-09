@@ -118,7 +118,7 @@ async def list_marketplace(kind: Optional[str] = None, user=Depends(get_current_
                     "queries": data.get("queries", []),
                 }
             )
-        except:
+        except Exception:
             continue
     return out
 
@@ -147,7 +147,7 @@ async def install_item(mid: str, request: Request, user=Depends(get_current_user
     body = {}
     try:
         body = await request.json()
-    except:
+    except Exception:
         body = {}
     dataset_id = body.get("dataset_id")
     if not dataset_id:
@@ -180,7 +180,7 @@ async def install_item(mid: str, request: Request, user=Depends(get_current_user
         for q in tmpl.get("queries", [])[:3]:
             try:
                 add_widget(dash["id"], {"query": q, "title": q[:40]})
-            except:
+            except Exception:
                 pass
         # refresh dash
         from app.services.dashboard_service import get_dashboard

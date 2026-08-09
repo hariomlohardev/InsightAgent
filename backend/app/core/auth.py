@@ -23,13 +23,13 @@ def _jwt_secret() -> str:
     if p.exists():
         try:
             return p.read_text().strip()
-        except:
+        except Exception:
             pass
     # Generate
     new_sec = secrets.token_urlsafe(32)
     try:
         p.write_text(new_sec)
-    except:
+    except Exception:
         pass
     return new_sec
 
@@ -68,7 +68,7 @@ def verify_password(password: str, hashed: str) -> bool:
         dk = raw[16:]
         check = hashlib.pbkdf2_hmac("sha256", password.encode(), salt, 100000)
         return hmac_compare(check, dk)
-    except:
+    except Exception:
         return False
 
 
@@ -84,7 +84,7 @@ def list_users():
         try:
             with open(f) as jf:
                 out.append(json.load(jf))
-        except:
+        except Exception:
             continue
     return out
 
@@ -96,7 +96,7 @@ def get_user_by_id(uid: str) -> Optional[Dict[str, Any]]:
     try:
         with open(p) as f:
             return json.load(f)
-    except:
+    except Exception:
         return None
 
 
@@ -131,7 +131,7 @@ def create_user(
 
         if workspace_id is None and is_cloud():
             workspace_id = get_workspace_id()
-    except:
+    except Exception:
         workspace_id = workspace_id or "default"
     if not workspace_id:
         workspace_id = "default"
@@ -186,7 +186,7 @@ def seed_admin():
                     f"[SECURITY] Generated admin {email} password: {gen_pwd} — set ADMIN_EMAIL/ADMIN_PASSWORD env to persist",
                     flush=True,
                 )
-            except:
+            except Exception:
                 pass
             pwd = gen_pwd
             # refuse to use predictable defaults
@@ -291,7 +291,7 @@ def decode_jwt(token: str) -> Optional[Dict[str, Any]]:
             if not _hm.compare_digest(expected_sig, sig):
                 return None
             return data
-        except:
+        except Exception:
             return None
 
 
@@ -325,7 +325,7 @@ def get_api_key_by_raw(raw: str) -> Optional[Dict[str, Any]]:
     try:
         with open(p) as f:
             return json.load(f)
-    except:
+    except Exception:
         return None
 
 
@@ -342,7 +342,7 @@ def delete_api_key(hashed_or_id: str) -> bool:
                 if data.get("id") == hashed_or_id or data.get("hashed") == hashed_or_id:
                     found = f
                     break
-        except:
+        except Exception:
             continue
     if found:
         found.unlink()
@@ -364,7 +364,7 @@ def list_api_keys(user_id: str = None):
                 data = json.load(jf)
                 if user_id is None or data.get("user_id") == user_id:
                     out.append(data)
-        except:
+        except Exception:
             continue
     return out
 
@@ -393,7 +393,7 @@ def ensure_workspace(ws_id: str, name: str = "", owner_id: str = "") -> Path:
         try:
             with open(meta_p) as f:
                 meta = json.load(f)
-        except:
+        except Exception:
             meta = {}
     # billing.json
     b_p = base / "billing.json"
@@ -420,7 +420,7 @@ def get_workspace_meta(ws_id: str) -> Optional[Dict[str, Any]]:
     try:
         with open(p) as f:
             return json.load(f)
-    except:
+    except Exception:
         return None
 
 

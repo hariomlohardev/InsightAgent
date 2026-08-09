@@ -39,7 +39,7 @@ def list_schedules() -> List[Dict[str, Any]]:
             with open(f) as jf:
                 data = json.load(jf)
                 out.append(data)
-        except:
+        except Exception:
             continue
     out.sort(key=lambda x: x.get("created_at", ""), reverse=True)
     return out
@@ -52,7 +52,7 @@ def get_schedule(sid: str) -> Optional[Dict[str, Any]]:
     try:
         with open(p) as f:
             return json.load(f)
-    except:
+    except Exception:
         return None
 
 
@@ -116,7 +116,7 @@ def delete_schedule(sid: str) -> bool:
         from app.services.scheduler import remove_job
 
         remove_job(sid)
-    except:
+    except Exception:
         pass
     p = _schedule_path(sid)
     if p.exists():
@@ -217,7 +217,7 @@ def run_schedule(sid: str) -> Dict[str, Any]:
                                     total += pd.to_numeric(
                                         df_tmp[num_cols[0]], errors="coerce"
                                     ).sum()
-                            except:
+                            except Exception:
                                 pass
                     last_total = sched.get("last_total")
                     sched["last_total"] = float(total)
@@ -262,7 +262,7 @@ def run_schedule(sid: str) -> Dict[str, Any]:
 
                 try:
                     loop = _asyncio.get_event_loop()
-                except:
+                except Exception:
                     loop = None
                 if loop and loop.is_running():
                     # In async context? just create task

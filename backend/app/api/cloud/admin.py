@@ -41,7 +41,7 @@ async def admin_stats(user=Depends(require_role("admin"))):
                 ddir = w / "datasets"
                 if ddir.exists():
                     total_datasets += sum(1 for _ in ddir.iterdir() if _.is_dir())
-    except:
+    except Exception:
         pass
     # also schedules count
     total_schedules = 0
@@ -57,7 +57,7 @@ async def admin_stats(user=Depends(require_role("admin"))):
         # default schedules
         if (base / "schedules").exists():
             total_schedules += sum(1 for _ in (base / "schedules").glob("*.json"))
-    except:
+    except Exception:
         pass
     return {
         "total_workspaces": total_ws,

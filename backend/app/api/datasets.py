@@ -67,7 +67,7 @@ async def upload_dataset(
                 raise HTTPException(status_code=402, detail=msg)
     except HTTPException:
         raise
-    except:
+    except Exception:
         pass
     # Validate original filename extension before sanitizing (strict)
     original_name = file.filename or "upload.csv"
@@ -102,7 +102,7 @@ async def upload_dataset(
                     try:
                         tmp.close()
                         tmp_path.unlink(missing_ok=True)
-                    except:
+                    except Exception:
                         pass
                     raise HTTPException(
                         status_code=413, detail=f"File too large. Max {settings.max_upload_mb}MB"
@@ -121,7 +121,7 @@ async def upload_dataset(
         if tmp_path and tmp_path.exists():
             try:
                 tmp_path.unlink()
-            except:
+            except Exception:
                 pass
         raise HTTPException(status_code=400, detail=f"Failed to read file: {str(e)}")
     # Verify not whitespace only (quick check)
@@ -137,7 +137,7 @@ async def upload_dataset(
                     raise HTTPException(status_code=400, detail="File contains only whitespace.")
     except HTTPException:
         raise
-    except:
+    except Exception:
         pass
 
     try:
@@ -178,7 +178,7 @@ async def upload_dataset(
                 m = _j.load(jf)
             m["owner"] = user.get("id")
             _atomic_write_json(p, m)
-        except:
+        except Exception:
             pass
         audit_log(
             "dataset.upload",
@@ -265,7 +265,7 @@ async def get_dataset(dataset_id: str, request: Request = None):
         if cached and isinstance(cached, dict) and "dataset" in cached:
             # Return cached with X-Cache header
             return JSONResponse(content=cached, headers={"X-Cache": "HIT"})
-    except:
+    except Exception:
         pass
     # For connectors, if live fetch fails, return stored profile instead of 500
     if meta.get("type") == "connector":
@@ -287,7 +287,7 @@ async def get_dataset(dataset_id: str, request: Request = None):
 
                 ck = ckf(f"dataset_resp:{dataset_id}:{version}")
                 cache_set(ck, resp.model_dump(), ttl=60)
-            except:
+            except Exception:
                 pass
             return resp
         except Exception as e:
@@ -337,7 +337,7 @@ async def get_dataset(dataset_id: str, request: Request = None):
 
         ck = ckf(f"dataset_resp:{dataset_id}:{version}")
         cache_set(ck, resp_data, ttl=60)
-    except:
+    except Exception:
         pass
     # Use JSONResponse to allow X-Cache header
     from fastapi.responses import JSONResponse as JR
@@ -460,7 +460,7 @@ async def revert_version_endpoint(dataset_id: str, body: dict):
         raise HTTPException(status_code=400, detail="Missing version")
     try:
         version = int(version)
-    except:
+    except Exception:
         raise HTTPException(status_code=400, detail="Invalid version")
     ok = await __import__("asyncio").to_thread(storage.revert_to_version, dataset_id, version)
     if not ok:

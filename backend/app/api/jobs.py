@@ -20,7 +20,7 @@ async def get_job(job_id: str):
         try:
             with open(p) as f:
                 return json.load(f)
-        except:
+        except Exception:
             pass
     # Try redis
     try:
@@ -29,6 +29,6 @@ async def get_job(job_id: str):
         v = cache_get(f"job:{job_id}")
         if v:
             return v
-    except:
+    except Exception:
         pass
     raise HTTPException(status_code=404, detail="Job not found")

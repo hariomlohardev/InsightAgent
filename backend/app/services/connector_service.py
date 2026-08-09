@@ -30,7 +30,7 @@ def list_connectors() -> List[Dict[str, Any]]:
             with open(f) as jf:
                 data = json.load(jf)
                 out.append(data)
-        except:
+        except Exception:
             continue
     out.sort(key=lambda x: x.get("created_at", ""), reverse=True)
     return out
@@ -43,7 +43,7 @@ def get_connector(cid: str) -> Optional[Dict[str, Any]]:
     try:
         with open(p) as f:
             return json.load(f)
-    except:
+    except Exception:
         return None
 
 
@@ -62,14 +62,14 @@ def delete_connector(cid: str) -> bool:
         try:
             shutil.rmtree(d)
             ok = True
-        except:
+        except Exception:
             pass
     # Also cache
     try:
         cache = get_storage_path() / "connectors" / "cache" / f"{cid}.csv"
         if cache.exists():
             cache.unlink()
-    except:
+    except Exception:
         pass
     return ok
 
@@ -160,7 +160,7 @@ def create_connector(
             rows_est = len(df_count)
             if len(df_count) == 10000:
                 rows_est = 10000  # capped
-        except:
+        except Exception:
             rows_est = len(df_sample)
         connector["sample_error"] = None
     except Exception as e:
@@ -218,7 +218,7 @@ def create_connector(
     try:
         if "df_sample" in locals() and df_sample is not None and not df_sample.empty:
             df_sample.to_csv(ds_dir / "data.csv", index=False)
-    except:
+    except Exception:
         pass
 
     return meta  # Return dataset-like meta so API can reuse DatasetResponse + connector info

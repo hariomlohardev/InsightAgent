@@ -114,7 +114,7 @@ def plot_outliers(df_flagged: pd.DataFrame, col: str, date_col: str = None):
                 x = df_flagged.index
             else:
                 x = df_flagged[date_col]
-        except:
+        except Exception:
             x = df_flagged.index
         xlabel = date_col
     else:

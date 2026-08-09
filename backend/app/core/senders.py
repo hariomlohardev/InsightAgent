@@ -50,7 +50,7 @@ def send_email(to: str, subject: str, body: str, attachments: Optional[List[tupl
                 s.ehlo()
                 try:
                     s.starttls()
-                except:
+                except Exception:
                     pass
                 if user and pwd:
                     s.login(user, pwd)
@@ -137,7 +137,7 @@ def send_slack_via_bot(
                     files={"file": (filename, file_bytes, "image/png")},
                     timeout=10,
                 )
-            except:
+            except Exception:
                 pass
         return {"status": "sent", "channel": channel}
     except Exception as e:

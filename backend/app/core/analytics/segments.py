@@ -38,7 +38,7 @@ def segment(df: pd.DataFrame, by: str, metric: str, agg: str = "sum") -> pd.Data
                 # For each segment, compute last vs first period count growth (simplified)
                 # We compute overall period trend per segment: count per period last vs first
                 pass
-            except:
+            except Exception:
                 pass
         grouped = grouped.rename(columns={by: "category", metric_col: "value"})
         grouped["metric"] = orig_metric
@@ -47,7 +47,7 @@ def segment(df: pd.DataFrame, by: str, metric: str, agg: str = "sum") -> pd.Data
         # Numeric metric
         try:
             df[metric] = pd.to_numeric(df[metric], errors="coerce")
-        except:
+        except Exception:
             pass
         if agg not in ("sum", "mean", "median", "max", "min", "count"):
             agg = "sum"
@@ -105,7 +105,7 @@ def segment(df: pd.DataFrame, by: str, metric: str, agg: str = "sum") -> pd.Data
                     )
                     # Rename for grouped which currently has by column not category yet
                     pass
-            except:
+            except Exception:
                 pass
         grouped = grouped.rename(columns={by: "category"})
         # Sort
@@ -131,7 +131,7 @@ def plot_segment(df_seg: pd.DataFrame, by_label: str = "category") -> go.Figure:
             fig = px.treemap(
                 df_seg, path=["category"], values="value", title=f"Segment by {by_label} — treemap"
             )
-        except:
+        except Exception:
             fig = px.bar(df_seg.head(10), x="category", y="value", title=f"Segment by {by_label}")
     fig.update_layout(height=380, margin=dict(l=10, r=10, t=40, b=10))
     return fig

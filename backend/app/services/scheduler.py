@@ -44,7 +44,7 @@ def add_job(sched: dict):
         # Avoid duplicate
         try:
             sch.remove_job(sched["id"])
-        except:
+        except Exception:
             pass
 
         def _runner():
@@ -69,7 +69,7 @@ def remove_job(sid: str):
     try:
         sch = get_scheduler()
         sch.remove_job(sid)
-    except:
+    except Exception:
         pass
 
 
@@ -96,6 +96,6 @@ def shutdown():
     if _scheduler:
         try:
             _scheduler.shutdown(wait=False)
-        except:
+        except Exception:
             pass
         _scheduler = None

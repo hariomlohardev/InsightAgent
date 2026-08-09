@@ -167,7 +167,7 @@ def _try_get(path: str, timeout: float = 1.0):
             r = _SESSION.get(url, timeout=t)
             if r.status_code == 200:
                 return r
-        except:
+        except Exception:
             continue
     return None
 
@@ -210,7 +210,7 @@ def list_datasets():
             r = _SESSION.get(f"{base}/api/datasets", timeout=2)
             if r.status_code == 200:
                 return r.json()
-        except:
+        except Exception:
             continue
     return []
 
@@ -240,7 +240,7 @@ def _get_dataset_details_cached(dataset_id, version):
                 return r.json()
             if r.status_code == 404:
                 return None
-        except:
+        except Exception:
             continue
     return None
 
@@ -256,13 +256,13 @@ def get_dataset_details(dataset_id):
                     j = rv.json()
                     _ver = j.get("current_version", 0) if isinstance(j, dict) else 0
                     break
-            except:
+            except Exception:
                 continue
         # fallback: if versions endpoint fails, try to infer from cached details quickly
         if _ver == 0:
             # try list_datasets version hint? keep 0
             pass
-    except:
+    except Exception:
         _ver = 0
     return _get_dataset_details_cached(dataset_id, _ver)
 
@@ -358,7 +358,7 @@ def chat_query(dataset_id, query, conv_id=None):
             import logging
 
             logging.getLogger(__name__).exception("chat_query failed: %s", e)
-        except:
+        except Exception:
             pass
         return None
 
@@ -372,7 +372,7 @@ def list_dashboards(dataset_id=None):
             url += f"?dataset_id={dataset_id}"
         r = _SESSION.get(url, timeout=1.5)
         return r.json() if r.status_code == 200 else []
-    except:
+    except Exception:
         return []
 
 
@@ -385,7 +385,7 @@ def create_dashboard(dataset_id, name, desc=""):
             timeout=10,
         )
         return r
-    except:
+    except Exception:
         return None
 
 
@@ -395,7 +395,7 @@ def get_dashboard(dash_id):
         if r.status_code == 200:
             return r.json()
         return None
-    except:
+    except Exception:
         return None
 
 
@@ -405,7 +405,7 @@ def get_shared(slug):
         if r.status_code == 200:
             return r.json()
         return None
-    except:
+    except Exception:
         return None
 
 
@@ -418,7 +418,7 @@ def add_widget_to_dash(dash_id, payload):
             timeout=10,
         )
         return r
-    except:
+    except Exception:
         return None
 
 
@@ -616,7 +616,7 @@ with st.sidebar:
                     try:
                         err_json = resp.json() if resp else {}
                         detail = err_json.get("detail", err)
-                    except:
+                    except Exception:
                         detail = err
                     st.error(f"Upload failed: {detail}")
                     st.toast(f"❌ {detail}", icon="⚠️")
@@ -684,7 +684,7 @@ with st.sidebar:
     try:
         r_c = _SESSION.get(f"{BACKEND_URL}/api/connectors", timeout=1.5)
         _conns_sidebar = r_c.json() if r_c.status_code == 200 else []
-    except:
+    except Exception:
         _conns_sidebar = []
     if _conns_sidebar:
         for _c in _conns_sidebar[:6]:
@@ -698,7 +698,7 @@ with st.sidebar:
         st.markdown("**📊 Dashboards**")
         try:
             _dashes = list_dashboards(dataset_id)
-        except:
+        except Exception:
             _dashes = []
         if _dashes:
             for _d in _dashes[:10]:
@@ -733,7 +733,7 @@ with st.sidebar:
     try:
         r_s = _SESSION.get(f"{BACKEND_URL}/api/schedules", timeout=1.5)
         _scheds = r_s.json() if r_s.status_code == 200 else []
-    except:
+    except Exception:
         _scheds = []
     if _scheds:
         for _s in _scheds[:4]:
@@ -795,7 +795,7 @@ if not datasets:
                     else:
                         try:
                             st.error(r.json().get("detail", r.text))
-                        except:
+                        except Exception:
                             st.error(r.text)
         except Exception as e:
             st.error(str(e))
@@ -918,7 +918,7 @@ try:
                     + "</strong></div>",
                     unsafe_allow_html=True,
                 )
-except:
+except Exception:
     pass
 tabs_list = [
     "💬 Chat",
@@ -1230,7 +1230,7 @@ with tabs[0]:
                 elif resp.status_code == 400:
                     try:
                         detail = resp.json().get("detail", resp.text)
-                    except:
+                    except Exception:
                         detail = resp.text
                     st.error(f"Bad request: {detail}")
                     st.toast(f"❌ {detail[:80]}", icon="⚠️")
@@ -1277,7 +1277,7 @@ with tabs[0]:
                             f"{BACKEND_URL}/api/chat/conversations/{st.session_state['conversation_id']}",
                             timeout=3,
                         )
-                    except:
+                    except Exception:
                         pass
                 st.session_state["messages"] = []
                 st.session_state["conversation_id"] = None
@@ -1448,7 +1448,7 @@ with tabs[4]:
                 try:
                     df_b = pd.DataFrame(preview["before_preview"]["data"])
                     st.dataframe(df_b, use_container_width=True)
-                except:
+                except Exception:
                     st.json(preview["before_preview"])
         with col_a:
             st.markdown("**After (head)**")
@@ -1463,7 +1463,7 @@ with tabs[4]:
                         mime="text/csv",
                         key="clean_preview_csv",
                     )
-                except:
+                except Exception:
                     st.json(preview["preview"])
 
         # Chart
@@ -1471,7 +1471,7 @@ with tabs[4]:
             try:
                 fig = go.Figure(preview["chart"])
                 st.plotly_chart(fig, use_container_width=True)
-            except:
+            except Exception:
                 st.json(preview["chart"])
     elif preview and not preview.get("success"):
         st.error(f"Preview error: {preview.get('error','')}")
@@ -1634,7 +1634,7 @@ with tabs[5]:
                 current_version = (
                     r_v.json().get("current_version", 0) if r_v.status_code == 200 else 0
                 )
-            except:
+            except Exception:
                 current_version = 0
 
             widgets = dash.get("widgets", [])
@@ -1973,7 +1973,7 @@ with tabs[6]:
             try:
                 _list_r = requests.get(f"{BACKEND_URL}/api/connectors", timeout=5)
                 _conn_list = _list_r.json() if _list_r.status_code == 200 else []
-            except:
+            except Exception:
                 _conn_list = []
             if not _conn_list:
                 st.info("No connectors yet. Create one on the left.")
@@ -2028,9 +2028,9 @@ with tabs[6]:
                                                 title="Query preview",
                                             )
                                             st.plotly_chart(fig, use_container_width=True)
-                                        except:
+                                        except Exception:
                                             pass
-                                except:
+                                except Exception:
                                     st.json(j["preview"])
                                 st.json({k: j[k] for k in ("rows", "columns") if k in j})
                             elif r.status_code == 400:
@@ -2203,7 +2203,7 @@ with tabs[8]:
                     if datasets
                     else []
                 )
-            except:
+            except Exception:
                 _all_d = []
             # Dashboard picker from current dataset's dashboards + all
             dash_opts = {}
@@ -2304,7 +2304,7 @@ with tabs[8]:
             try:
                 rss = requests.get(f"{BACKEND_URL}/api/schedules", timeout=5)
                 scheds = rss.json() if rss.status_code == 200 else []
-            except:
+            except Exception:
                 scheds = []
             if not scheds:
                 st.info("No schedules yet — create on the left.")
@@ -2381,7 +2381,7 @@ with tabs[8]:
                     f"{BACKEND_URL}/api/dashboards/{rep_dash_id}", timeout=5
                 ).json()
                 _widgets = _rep_dash.get("widgets", [])
-            except:
+            except Exception:
                 _widgets = []
             if _widgets:
                 opts = {f"{w.get('title','Widget')} • {w.get('id')[:4]}": w["id"] for w in _widgets}
@@ -2428,7 +2428,7 @@ with tabs[8]:
         try:
             rr = requests.get(f"{BACKEND_URL}/api/reports", timeout=5)
             reps = rr.json() if rr.status_code == 200 else []
-        except:
+        except Exception:
             reps = []
         if reps:
             st.markdown("**Existing reports**")
@@ -2472,7 +2472,7 @@ with tabs[8]:
             try:
                 rc = requests.get(f"{BACKEND_URL}/api/dashboards/{c_dash_id}/comments", timeout=5)
                 comments = rc.json() if rc.status_code == 200 else []
-            except:
+            except Exception:
                 comments = []
             for cm in comments[-20:]:
                 st.markdown(f"**{cm.get('user','anon')}** • {cm.get('created_at','')[:16]}")
@@ -2575,7 +2575,7 @@ if is_cloud:
                     cur = requests.get(
                         f"{BACKEND_URL}/api/cloud/llm", headers=_auth_headers(), timeout=5
                     ).json()
-                except:
+                except Exception:
                     cur = {}
                 prov = st.selectbox(
                     "Provider",
