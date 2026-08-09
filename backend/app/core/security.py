@@ -205,6 +205,7 @@ def get_safe_globals(df):
         duckdb = None
 
     # Safe builtins - include __import__ for libraries (AST blocks user from using it with dangerous modules)
+    # NOTE: getattr/hasattr intentionally NOT exposed (validate_code blocks them). Do not re-add.
     safe_builtins_dict = {
         "len": len,
         "range": range,
@@ -227,8 +228,6 @@ def get_safe_globals(df):
         "print": print,
         "isinstance": isinstance,
         "issubclass": issubclass,
-        "hasattr": hasattr,
-        "getattr": getattr,
         "__import__": __import__,
     }
 

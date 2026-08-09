@@ -38,9 +38,27 @@ app = FastAPI(
     version=settings.version,
 )
 
+
+def _cors_origins():
+    raw = os.getenv("CORS_ALLOWED_ORIGINS", "").strip()
+    if raw:
+        # comma-separated explicit origins
+        origins = [o.strip() for o in raw.split(",") if o.strip()]
+        # never allow * with credentials
+        origins = [o for o in origins if o != "*"]
+        return origins
+    # dev default: explicit local origins (not wildcard)
+    return [
+        "http://localhost:8501",
+        "http://127.0.0.1:8501",
+        "http://localhost:3000",
+        "http://127.0.0.1:3000",
+    ]
+
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=_cors_origins(),
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],

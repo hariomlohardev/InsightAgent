@@ -83,7 +83,7 @@ def get_current_user(
     # No auth provided
     if auth_required or enterprise:
         raise HTTPException(status_code=401, detail="Authentication required")
-    # OSS anon: editor so legacy + OSS curl without token can upload (viewer token still blocked)
+    # Least-privilege anon: viewer (read-only). Editor requires auth even when AUTH_REQUIRED=false.
     anon_ws = "default"
     if is_cloud:
         try:
@@ -95,7 +95,7 @@ def get_current_user(
     return {
         "id": "anon",
         "email": "anon",
-        "role": "editor",
+        "role": "viewer",
         "name": "Anonymous",
         "workspace_id": anon_ws,
     }

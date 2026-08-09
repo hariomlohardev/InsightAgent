@@ -160,17 +160,50 @@ def update_user_role(uid: str, role: str) -> Optional[Dict[str, Any]]:
 
 
 def seed_admin():
-    # idempotent - called on startup
+    # idempotent - called on startup. Never create predictable admin/admin.
     try:
         if list_users():
             return None
-        # create default admin: admin@local / admin
-        email = os.getenv("ADMIN_EMAIL", "admin@local")
-        pwd = os.getenv("ADMIN_PASSWORD", "admin")
+        email = os.getenv("ADMIN_EMAIL")
+        pwd = os.getenv("ADMIN_PASSWORD")
+        # Require explicit credentials; if not provided, generate secure one-time password
+        if not email or not pwd:
+            # No explicit creds — do not create admin/admin. Generate secure random.
+            # For OSS dev convenience (AUTH_REQUIRED=false) we still need an admin but not predictable.
+            # Generate and log; existing deployments with admin@local remain untouched (list_users check above).
+            email = email or "admin@local"
+            # generate secure password, log warning
+            gen_pwd = secrets.token_urlsafe(16)
+            try:
+                import logging
+
+                logging.getLogger(__name__).warning(
+                    "ADMIN_PASSWORD not set — generated secure admin password for %s (store from logs, then set ADMIN_PASSWORD env for persistence).",
+                    email,
+                )
+                # also print to stderr for visibility in docker logs
+                print(
+                    f"[SECURITY] Generated admin {email} password: {gen_pwd} — set ADMIN_EMAIL/ADMIN_PASSWORD env to persist",
+                    flush=True,
+                )
+            except:
+                pass
+            pwd = gen_pwd
+            # refuse to use predictable defaults
+            if pwd in ("admin", "password", "123456"):
+                pwd = secrets.token_urlsafe(16)
+        else:
+            # env provided but check not predictable fallback still
+            if pwd == "admin" and email == "admin@local":
+                # explicit admin/admin requested — allow only if explicitly set, but warn
+                import logging
+
+                logging.getLogger(__name__).warning(
+                    "Using predictable admin/admin — set strong ADMIN_PASSWORD"
+                )
         user = create_user(email, pwd, role="admin", name="Admin")
         return user
     except Exception as e:
-        # already exists
         return None
 
 

@@ -101,14 +101,22 @@ def send_slack(
 
 
 def send_slack_via_bot(
-    token: str, channel: str, text: str, file_bytes: Optional[bytes] = None
+    token: str,
+    channel: str,
+    text: str,
+    file_bytes: Optional[bytes] = None,
+    filename: str = "chart.png",
 ) -> dict:
-    """If bot token provided, use chat.postMessage/files.upload"""
+    """If bot token provided, use chat.postMessage/files.upload. filename is explicit; no locals() check."""
     import httpx
 
+    # sanitize filename
+    if not filename or not isinstance(filename, str):
+        filename = "chart.png"
+    # basic sanitize: no path traversal
+    filename = filename.split("/")[-1].split("\\")[-1][:100] or "chart.png"
     headers = {"Authorization": f"Bearer {token}"}
     try:
-        # Post message
         r = httpx.post(
             "https://slack.com/api/chat.postMessage",
             json={"channel": channel, "text": text},
@@ -119,8 +127,6 @@ def send_slack_via_bot(
         if not j.get("ok"):
             return {"status": "error", "detail": str(j)[:300]}
         if file_bytes:
-            # Upload file
-            # files.upload is legacy; use files.uploadV2?
             try:
                 import requests
 
@@ -128,11 +134,7 @@ def send_slack_via_bot(
                     "https://slack.com/api/files.upload",
                     headers=headers,
                     data={"channels": channel, "initial_comment": text[:200]},
-                    files=(
-                        {"file": (filename, file_bytes, "image/png")}
-                        if "filename" in locals()
-                        else {"file": ("chart.png", file_bytes, "image/png")}
-                    ),
+                    files={"file": (filename, file_bytes, "image/png")},
                     timeout=10,
                 )
             except:

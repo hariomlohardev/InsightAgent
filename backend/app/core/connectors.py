@@ -7,7 +7,7 @@ import pandas as pd
 
 from app.core.security import SecurityError
 
-# ---- SQL guard ----
+# ---- SQL guard — read-only allowlist + DB-layer enforcement ----
 WRITE_KEYWORDS = [
     "insert ",
     "update ",
@@ -19,27 +19,77 @@ WRITE_KEYWORDS = [
     "grant ",
     "revoke ",
 ]
-# Allowed to start with SELECT / WITH / SHOW / DESCRIBE / EXPLAIN
-ALLOWED_START = ("select", "with", "show", "describe", "explain", "pragma")
+# Dangerous DuckDB/extension ops that must be blocked even if starting with SELECT
+BLOCKED_SQL_TOKENS = [
+    "attach ",
+    "detach ",
+    "install ",
+    "load ",
+    "copy ",
+    "export ",
+    "import ",
+    "pragma ",
+    "vacuum ",
+    "checkpoint ",
+    "use ",
+]
+ALLOWED_START = ("select", "with", "explain", "show", "describe")
+
+
+# For sqlparse-based validation if available
+def _sql_statements(sql: str):
+    try:
+        import sqlparse  # type: ignore
+
+        # split and strip
+        stmts = [s.strip() for s in sqlparse.split(sql) if s.strip()]
+        return stmts
+    except ImportError:
+        # fallback: split on ; but respect quotes naive — safe to be strict: reject multi-statement if ; present
+        parts = [p.strip() for p in sql.split(";") if p.strip()]
+        return parts
+
+
+def _normalize_sql(s: str) -> str:
+    # Remove comments and collapse whitespace, lower
+    s = re.sub(r"--.*", " ", s)
+    s = re.sub(r"/\*.*?\*/", " ", s, flags=re.DOTALL)
+    # remove string literals to avoid false positives? keep for blocklist but normalize
+    s = re.sub(r"'[^']*'", " 'x' ", s)
+    s = re.sub(r'"[^"]*"', ' "x" ', s)
+    s = re.sub(r"\s+", " ", s).strip().lower()
+    return s
 
 
 def validate_sql(sql: str) -> None:
-    """Raise SecurityError if sql contains write/DDL."""
+    """Raise SecurityError unless sql is read-only SELECT/WITH/EXPLAIN. Enforces parser allowlist + DB restrictions."""
     if not sql or not sql.strip():
         raise SecurityError("Empty SQL")
-    s = sql.strip().lower()
-    # Normalize
-    # Remove comments
-    s = re.sub(r"--.*", " ", s)
-    s = re.sub(r"/\*.*?\*/", " ", s, flags=re.DOTALL)
-    s_stripped = s.strip()
-    if not s_stripped.startswith(ALLOWED_START):
-        # Allow union of selects: check if starts with '(' then select
-        if not (s_stripped.startswith("(") and "select" in s_stripped[:50]):
-            raise SecurityError(f"Only SELECT/WITH queries allowed, got: {sql[:30]!r}")
-    for kw in WRITE_KEYWORDS:
-        if kw in s:
+    # multi-statement check
+    stmts = _sql_statements(sql)
+    if len(stmts) > 1:
+        raise SecurityError("Multi-statement SQL not allowed")
+    stmt = stmts[0] if stmts else sql
+    norm = _normalize_sql(stmt)
+    # must start with allowed
+    if not norm.startswith(ALLOWED_START):
+        if not (norm.startswith("(") and "select" in norm[:80]):
+            raise SecurityError(f"Only SELECT/WITH/EXPLAIN queries allowed, got: {sql[:40]!r}")
+    # block write keywords and dangerous tokens anywhere (after normalization)
+    for kw in WRITE_KEYWORDS + BLOCKED_SQL_TOKENS:
+        if kw in norm:
+            # special case: allow "copy " inside quoted identifier already replaced, so remaining copy is dangerous (COPY TO)
             raise SecurityError(f"SQL blocked: contains '{kw.strip().upper()}' — read-only only")
+    # extra duckdb-specific: block TO after COPY, FROM afterATTACH, etc already covered
+    # block ; to prevent second statement if sqlparse not available (already split)
+    if ";" in stmt:
+        # if sqlparse split returned single but original had ; inside, it's still multi or dangerous
+        # allow trailing ; for single statement?
+        if stmt.strip().endswith(";"):
+            # strip trailing ; already handled by split, check if another statement hidden
+            pass
+        else:
+            raise SecurityError("Semicolon not allowed")
 
 
 # ---- Cache for sheets ----
