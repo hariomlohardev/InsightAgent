@@ -2,6 +2,7 @@
 Regression tests for 8 fixes: async job, dataset cache, profiling cache, cleaning single-exec,
 polars path, list_datasets cache, streamlit version-aware. Lightweight, no Redis/DB needed.
 """
+
 import os
 import sys
 import time
@@ -75,8 +76,9 @@ def test_dataset_cache_hit_and_invalidation(monkeypatch, tmp_path):
     csv_path = tmp_path / "data.csv"
     pd.DataFrame({"a": [1, 2], "b": [3, 4]}).to_csv(csv_path, index=False)
 
-    with patch("app.core.storage.get_dataset_meta", side_effect=lambda x: meta_v0), patch(
-        "app.core.storage.get_dataset_path", return_value=csv_path
+    with (
+        patch("app.core.storage.get_dataset_meta", side_effect=lambda x: meta_v0),
+        patch("app.core.storage.get_dataset_path", return_value=csv_path),
     ):
         df1 = storage.load_dataset_df(did)
         df2 = storage.load_dataset_df(did)
@@ -88,17 +90,19 @@ def test_dataset_cache_hit_and_invalidation(monkeypatch, tmp_path):
             # should be new read (still equal content but cache miss exercised)
             assert df3.equals(df1)
             # ensure key includes version — cache has both
-            assert storage._df_cache_key(did, 0, True) in storage._DF_CACHE or storage._df_cache_key(
-                did, 0, False
-            ) in storage._DF_CACHE
+            assert (
+                storage._df_cache_key(did, 0, True) in storage._DF_CACHE
+                or storage._df_cache_key(did, 0, False) in storage._DF_CACHE
+            )
 
     # different dataset no collision
     did2 = "other456"
     meta_other = {"id": did2, "current_version": 0}
     csv2 = tmp_path / "data2.csv"
     pd.DataFrame({"x": [9]}).to_csv(csv2, index=False)
-    with patch("app.core.storage.get_dataset_meta", return_value=meta_other), patch(
-        "app.core.storage.get_dataset_path", return_value=csv2
+    with (
+        patch("app.core.storage.get_dataset_meta", return_value=meta_other),
+        patch("app.core.storage.get_dataset_path", return_value=csv2),
     ):
         df_o = storage.load_dataset_df(did2)
         assert list(df_o.columns) == ["x"]
@@ -196,12 +200,16 @@ def test_list_datasets_cache_invalidation(tmp_path, monkeypatch):
     for did in ["a1", "a2"]:
         d = fake_dir / did
         d.mkdir()
-        (d / "meta.json").write_text('{"id":"%s","original_filename":"f.csv","created_at":"2024-01-01T00:00:00"}' % did)
+        (d / "meta.json").write_text(
+            '{"id":"%s","original_filename":"f.csv","created_at":"2024-01-01T00:00:00"}' % did
+        )
         (d / "data.csv").write_text("a,b\n1,2\n")
 
-    with patch("app.core.storage._datasets_dir", return_value=fake_dir), patch(
-        "app.core.storage._db_list_metas", return_value=None
-    ), patch("app.core.storage._db_available", return_value=False):
+    with (
+        patch("app.core.storage._datasets_dir", return_value=fake_dir),
+        patch("app.core.storage._db_list_metas", return_value=None),
+        patch("app.core.storage._db_available", return_value=False),
+    ):
         storage._invalidate_list_cache()
         l1 = storage.list_datasets()
         l2 = storage.list_datasets()  # should be cached (2s)

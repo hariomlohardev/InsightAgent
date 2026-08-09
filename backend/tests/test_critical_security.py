@@ -1,6 +1,7 @@
 """
 Critical regression tests for 9 bugs: async, double exec, slack, auth, anon, CORS, sandbox, SQL, conversation race.
 """
+
 import os
 import re
 import sys
@@ -123,7 +124,7 @@ def test_slack_filename():
     # check signature has filename param
     assert "filename" in src.split("def send_slack_via_bot")[1].split(")")[0]
     # check files dict uses filename variable directly
-    assert 'files={"file": (filename, file_bytes' in src or "files={\"file\": (filename" in src
+    assert 'files={"file": (filename, file_bytes' in src or 'files={"file": (filename' in src
 
     # runtime test
     from app.core.senders import send_slack_via_bot
@@ -201,7 +202,9 @@ def test_anon_viewer():
     from app.api.auth import get_current_user
 
     # mock no credentials, no api key
-    with patch.dict(os.environ, {"AUTH_REQUIRED": "false", "ENTERPRISE": "false", "CLOUD": "false"}):
+    with patch.dict(
+        os.environ, {"AUTH_REQUIRED": "false", "ENTERPRISE": "false", "CLOUD": "false"}
+    ):
         user = get_current_user(credentials=None, x_api_key=None, request=None)
         assert user["role"] == "viewer"
         assert user["id"] == "anon"
@@ -233,7 +236,13 @@ def test_sandbox_getattr_blocked():
     # ensure validate still blocks
     from app.core.security import validate_code, SecurityError
 
-    for snippet in ["getattr(df, 'columns')", "hasattr(df, 'x')", "open('a')", "eval('1')", "__import__('os')"]:
+    for snippet in [
+        "getattr(df, 'columns')",
+        "hasattr(df, 'x')",
+        "open('a')",
+        "eval('1')",
+        "__import__('os')",
+    ]:
         try:
             validate_code(snippet)
             assert False, f"should block {snippet}"
@@ -258,7 +267,12 @@ def test_sql_guard():
     from app.core.security import SecurityError
 
     # allowed
-    for q in ["SELECT * FROM t", "WITH c AS (SELECT 1) SELECT * FROM c", "EXPLAIN SELECT * FROM t", "SHOW TABLES"]:
+    for q in [
+        "SELECT * FROM t",
+        "WITH c AS (SELECT 1) SELECT * FROM c",
+        "EXPLAIN SELECT * FROM t",
+        "SHOW TABLES",
+    ]:
         validate_sql(q)  # should not raise
 
     # blocked
@@ -330,8 +344,9 @@ def test_conversation_race_fix():
 
     tmp = Path(tempfile.mkdtemp())
     # patch dirs
-    with patch("app.core.storage._conversations_dir", return_value=tmp), patch(
-        "app.config.get_storage_path", return_value=tmp
+    with (
+        patch("app.core.storage._conversations_dir", return_value=tmp),
+        patch("app.config.get_storage_path", return_value=tmp),
     ):
         tmp.mkdir(exist_ok=True)
         ids = set()

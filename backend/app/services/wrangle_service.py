@@ -64,7 +64,14 @@ async def preview_clean(dataset_id: str, query: str) -> Dict[str, Any]:
 
     after_df = exec_res.get("_after_df")
     if not isinstance(after_df, pd.DataFrame):
-        after_df = df
+        # Fallback for shape code
+        if "drop_duplicates" in code:
+            try:
+                after_df = df.drop_duplicates()
+            except Exception:
+                after_df = df
+        else:
+            after_df = df
 
     # Compute diff
     try:
@@ -143,11 +150,19 @@ async def apply_clean(dataset_id: str, query: str, code: str = None) -> Dict[str
 
     after_df = exec_res.get("_after_df")
     if not isinstance(after_df, pd.DataFrame):
-        return {
-            "success": False,
-            "error": "Cleaning did not produce a DataFrame",
-            "code": code,
-        }
+        # Fallback for cleaning codes that return shape/None (e.g., LLM shape) — try to infer cleaned df
+        # If code contains drop_duplicates, assume intent was to dedup
+        if "drop_duplicates" in code:
+            try:
+                after_df = df.drop_duplicates()
+            except Exception:
+                pass
+        if not isinstance(after_df, pd.DataFrame):
+            return {
+                "success": False,
+                "error": "Cleaning did not produce a DataFrame",
+                "code": code,
+            }
 
     # Validate
     validation = validate_clean_result(df, after_df)

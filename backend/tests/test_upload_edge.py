@@ -1,10 +1,58 @@
 import tempfile
+import uuid
 from pathlib import Path
 import pandas as pd
 from fastapi.testclient import TestClient
 from app.main import app
+from app.core import auth as auth_core
 
 client = TestClient(app)
+
+
+# auth for upload (anon is viewer after security fix)
+def _auth_headers():
+    email = f"u_{uuid.uuid4().hex[:6]}@example.com"
+    try:
+        u = auth_core.create_user(email, "TestPass123!", role="editor")
+    except Exception:
+        u = auth_core.get_user_by_email(email)
+    return {"Authorization": f"Bearer {auth_core.create_jwt(u)}"}
+
+
+_AUTH = _auth_headers()
+# auto-auth wrapper (anon is viewer after fix)
+_orig_post = client.post
+
+
+def _post(*args, **kwargs):
+    kwargs.setdefault("headers", _AUTH)
+    # merge if caller passed headers
+    if "headers" in kwargs and kwargs["headers"] is not _AUTH:
+        # caller headers override, but keep auth if not present
+        pass
+    return _orig_post(*args, **kwargs)
+
+
+client.post = _post
+_orig_delete = client.delete
+
+
+def _delete(*args, **kwargs):
+    kwargs.setdefault("headers", _AUTH)
+    return _orig_delete(*args, **kwargs)
+
+
+client.delete = _delete
+_orig_get = client.get
+
+
+def _get(*args, **kwargs):
+    # GET is viewer-allowed, but add auth to keep consistent
+    kwargs.setdefault("headers", _AUTH)
+    return _orig_get(*args, **kwargs)
+
+
+client.get = _get
 
 
 def test_upload_empty_file():
