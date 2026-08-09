@@ -14,6 +14,35 @@ def _auth_headers(token: str):
     return {"Authorization": f"Bearer {token}"}
 
 
+def _ensure_admin_token(c):
+    """Get admin token, works with secure random seed_admin."""
+    r = c.post("/api/auth/login", json={"email": "admin@local", "password": "admin"})
+    if r.status_code == 200 and "access_token" in r.json():
+        return r.json()["access_token"]
+    try:
+        from app.core.auth import list_users, create_jwt, create_user
+        import uuid
+
+        for u in list_users():
+            if u.get("role") == "admin":
+                try:
+                    return create_jwt(u)
+                except Exception:
+                    continue
+        email = f"admin_{uuid.uuid4().hex[:6]}@example.com"
+        pwd = "AdminPass123!"
+        reg = c.post("/api/auth/register", json={"email": email, "password": pwd, "role": "admin"})
+        if reg.status_code == 201:
+            login = c.post("/api/auth/login", json={"email": email, "password": pwd})
+            if login.status_code == 200:
+                return login.json()["access_token"]
+        u = create_user(email, pwd, role="admin")
+        return create_jwt(u)
+    except Exception:
+        pass
+    raise RuntimeError("Could not obtain admin token")
+
+
 def _register_cloud_client(email, pwd, ws_name="WS"):
     c = get_client()
     # ensure CLOUD true for this test
@@ -411,15 +440,7 @@ def test_marketplace():
 
 def test_admin_stats():
     c = get_client()
-    # admin login (default)
-    r = c.post("/api/auth/login", json={"email": "admin@local", "password": "admin"})
-    if r.status_code != 200:
-        c.post(
-            "/api/auth/register",
-            json={"email": "admin@local", "password": "admin", "role": "admin"},
-        )
-        r = c.post("/api/auth/login", json={"email": "admin@local", "password": "admin"})
-    token = r.json()["access_token"]
+    token = _ensure_admin_token(c)
     r2 = c.get("/api/cloud/admin/stats", headers=_auth_headers(token))
     assert r2.status_code == 200
     data = r2.json()

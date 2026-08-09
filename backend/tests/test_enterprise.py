@@ -20,6 +20,41 @@ def _auth_headers(token: str):
     return {"Authorization": f"Bearer {token}"}
 
 
+def _ensure_admin_token(c):
+    """Get admin token, works with secure random seed_admin (not admin/admin)."""
+    # Try hardcoded first (for old dev env with ADMIN_PASSWORD=admin)
+    r = c.post("/api/auth/login", json={"email": "admin@local", "password": "admin"})
+    if r.status_code == 200 and "access_token" in r.json():
+        return r.json()["access_token"]
+    # Try to find existing admin via auth module and create JWT directly
+    try:
+        from app.core.auth import list_users, create_jwt, create_user
+        import uuid
+
+        # Try any existing admin
+        for u in list_users():
+            if u.get("role") == "admin":
+                try:
+                    return create_jwt(u)
+                except Exception:
+                    continue
+        # Create a fresh admin for this test run
+        email = f"admin_{uuid.uuid4().hex[:6]}@example.com"
+        pwd = "AdminPass123!"
+        # Try via API
+        reg = c.post("/api/auth/register", json={"email": email, "password": pwd, "role": "admin"})
+        if reg.status_code == 201:
+            login = c.post("/api/auth/login", json={"email": email, "password": pwd})
+            if login.status_code == 200:
+                return login.json()["access_token"]
+        # Direct via auth module
+        u = create_user(email, pwd, role="admin")
+        return create_jwt(u)
+    except Exception:
+        pass
+    raise RuntimeError("Could not obtain admin token")
+
+
 def test_auth_register_login_me():
     c = get_client()
     # Clean any old test users? Use unique email
@@ -61,18 +96,7 @@ def test_auth_register_login_me():
 
 def test_admin_seed_and_rbac_viewer_blocked():
     c = get_client()
-    # Login as admin (seeded)
-    # Seed admin is admin@local / admin
-    r = c.post("/api/auth/login", json={"email": "admin@local", "password": "admin"})
-    if r.status_code != 200:
-        # try to register admin? Should already exist
-        c.post(
-            "/api/auth/register",
-            json={"email": "admin@local", "password": "admin", "role": "admin"},
-        )
-        r = c.post("/api/auth/login", json={"email": "admin@local", "password": "admin"})
-    assert r.status_code == 200, r.text
-    admin_token = r.json()["access_token"]
+    admin_token = _ensure_admin_token(c)
     # Create viewer user
     email_v = f"viewer_{int(time.time())}@example.com"
     c.post("/api/auth/register", json={"email": email_v, "password": "pass12345", "role": "viewer"})
@@ -113,15 +137,7 @@ def test_admin_seed_and_rbac_viewer_blocked():
 
 def test_audit_log():
     c = get_client()
-    # Login admin
-    r = c.post("/api/auth/login", json={"email": "admin@local", "password": "admin"})
-    if r.status_code != 200:
-        c.post(
-            "/api/auth/register",
-            json={"email": "admin@local", "password": "admin", "role": "admin"},
-        )
-        r = c.post("/api/auth/login", json={"email": "admin@local", "password": "admin"})
-    token = r.json()["access_token"]
+    token = _ensure_admin_token(c)
     # Do an action
     df = pd.DataFrame({"A": [1], "B": [2]})
     with tempfile.NamedTemporaryFile(suffix=".csv", delete=False, mode="w") as tmp:
@@ -176,8 +192,7 @@ def test_cache_and_polars_optional():
             df2.to_csv(tmp.name, index=False)
             p = Path(tmp.name)
         c2 = get_client()
-        login_r = c2.post("/api/auth/login", json={"email": "admin@local", "password": "admin"})
-        token_p = login_r.json()["access_token"]
+        token_p = _ensure_admin_token(c2)
         with open(p, "rb") as f:
             r = c2.post(
                 "/api/datasets/upload",
@@ -200,17 +215,7 @@ def test_queue_sync_fallback_without_redis():
     old = os.environ.pop("REDIS_URL", None)
     try:
         c2 = get_client()
-        # login as admin for upload (viewer/anon cannot upload)
-        login_admin = c2.post("/api/auth/login", json={"email": "admin@local", "password": "admin"})
-        if login_admin.status_code != 200:
-            c2.post(
-                "/api/auth/register",
-                json={"email": "admin@local", "password": "admin", "role": "admin"},
-            )
-            login_admin = c2.post(
-                "/api/auth/login", json={"email": "admin@local", "password": "admin"}
-            )
-        tok = login_admin.json()["access_token"]
+        tok = _ensure_admin_token(c2)
         ah = _auth_headers(tok)
         df = pd.read_csv(Path(__file__).resolve().parents[2] / "sample_data/sales.csv")
         with tempfile.NamedTemporaryFile(suffix=".csv", delete=False, mode="w") as tmp:
