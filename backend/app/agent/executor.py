@@ -160,6 +160,7 @@ def execute_code(code: str, df: pd.DataFrame, timeout: int = None) -> Dict[str, 
             "result_json": None,
             "chart_json": None,
             "code": code,
+            "_after_df": None,
         }
     except Exception as e:
         return {
@@ -169,6 +170,7 @@ def execute_code(code: str, df: pd.DataFrame, timeout: int = None) -> Dict[str, 
             "result_json": None,
             "chart_json": None,
             "code": code,
+            "_after_df": None,
         }
 
     # Prepare execution env
@@ -248,6 +250,15 @@ def execute_code(code: str, df: pd.DataFrame, timeout: int = None) -> Dict[str, 
             }
 
         chart_json = fig_to_json(fig)
+        # expose after_df for cleaning diff without second exec
+        _after = None
+        if isinstance(result, pd.DataFrame):
+            _after = result
+        elif isinstance(result, pd.Series):
+            try:
+                _after = result.to_frame()
+            except:
+                pass
 
         return {
             "success": True,
@@ -256,6 +267,7 @@ def execute_code(code: str, df: pd.DataFrame, timeout: int = None) -> Dict[str, 
             "stdout": stdout_val,
             "error": None,
             "code": code,
+            "_after_df": _after,
         }
 
     except TimeoutException as e:
@@ -266,6 +278,7 @@ def execute_code(code: str, df: pd.DataFrame, timeout: int = None) -> Dict[str, 
             "result_json": None,
             "chart_json": None,
             "code": code,
+            "_after_df": None,
         }
     except Exception as e:
         tb = traceback.format_exc()
@@ -276,6 +289,7 @@ def execute_code(code: str, df: pd.DataFrame, timeout: int = None) -> Dict[str, 
             "result_json": None,
             "chart_json": None,
             "code": code,
+            "_after_df": None,
         }
     finally:
         sys.stdout = old_stdout

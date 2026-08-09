@@ -270,8 +270,10 @@ async def get_dataset(dataset_id: str, request: Request = None):
     # For connectors, if live fetch fails, return stored profile instead of 500
     if meta.get("type") == "connector":
         try:
-            df = storage.load_dataset_df(dataset_id)
-            profile = profile_dataframe(df, dataset_id=dataset_id, version=version)
+            import asyncio
+
+            df = await asyncio.to_thread(storage.load_dataset_df, dataset_id)
+            profile = await asyncio.to_thread(profile_dataframe, df, 5, True, dataset_id, version)
             preview_df = df.head(10)
             from app.agent.executor import dataframe_to_json
 
@@ -314,8 +316,10 @@ async def get_dataset(dataset_id: str, request: Request = None):
                 dataset=DatasetResponse(**meta), profile=profile, preview=preview
             )
     try:
-        df = storage.load_dataset_df(dataset_id)
-        profile = profile_dataframe(df, dataset_id=dataset_id, version=version)
+        import asyncio
+
+        df = await asyncio.to_thread(storage.load_dataset_df, dataset_id)
+        profile = await asyncio.to_thread(profile_dataframe, df, 5, True, dataset_id, version)
         preview_df = df.head(10)
         from app.agent.executor import dataframe_to_json
 
@@ -347,7 +351,9 @@ async def preview_dataset(dataset_id: str, rows: int = Query(10, ge=1, le=100)):
     if not meta:
         raise HTTPException(status_code=404, detail="Dataset not found")
     try:
-        df = storage.load_dataset_df(dataset_id)
+        import asyncio
+
+        df = await asyncio.to_thread(storage.load_dataset_df, dataset_id)
         from app.agent.executor import dataframe_to_json
 
         preview = dataframe_to_json(df.head(rows), max_rows=rows)
@@ -456,13 +462,15 @@ async def revert_version_endpoint(dataset_id: str, body: dict):
         version = int(version)
     except:
         raise HTTPException(status_code=400, detail="Invalid version")
-    ok = storage.revert_to_version(dataset_id, version)
+    ok = await __import__("asyncio").to_thread(storage.revert_to_version, dataset_id, version)
     if not ok:
         raise HTTPException(status_code=404, detail=f"Version {version} not found")
     # Return new profile
     try:
-        df = storage.load_dataset_df(dataset_id)
-        profile = profile_dataframe(df)
+        import asyncio
+
+        df = await asyncio.to_thread(storage.load_dataset_df, dataset_id)
+        profile = await asyncio.to_thread(profile_dataframe, df, 5, True, dataset_id, version)
         return {
             "status": "reverted",
             "version": version,

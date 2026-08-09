@@ -6,32 +6,30 @@ from app.agent import planner, coder, executor, explainer
 
 async def process_query(dataset_id: str, query: str, conversation_id: str = None) -> Dict[str, Any]:
     """Full agent pipeline: plan -> code -> execute -> explain. Handles cleaning via wrangle diff."""
-    df = storage.load_dataset_df(dataset_id)
-    profile = profile_dataframe(df)
+    # run blocking IO off event loop
+    import asyncio
+
+    df = await asyncio.to_thread(storage.load_dataset_df, dataset_id)
+    # stable profiling cache key dataset_id:version
+    try:
+        _meta = storage.get_dataset_meta(dataset_id)
+        _ver = _meta.get("current_version", 0) if _meta else 0
+    except:
+        _ver = 0
+    profile = await asyncio.to_thread(profile_dataframe, df, 5, True, dataset_id, _ver)
     intent = await planner.plan(query, profile)
     # For cleaning intent, also compute diff via wrangle for richer response
     is_cleaning = intent.get("intent") == "cleaning"
     code_res = await coder.generate_code(query, profile, intent)
     code = code_res["code"]
     code_exp = code_res.get("explanation", "")
-    exec_res = executor.execute_code(code, df)
-    # If cleaning, compute diff
+    exec_res = await asyncio.to_thread(executor.execute_code, code, df)
     diff = None
     if is_cleaning and exec_res.get("success"):
         try:
             from app.core.wrangle import diff_dataframes
-            from app.core.security import get_safe_globals
-            import pandas as pd
 
-            safe_globals = get_safe_globals(df)
-            local_vars = {}
-            exec(code, safe_globals, local_vars)
-            after_df = local_vars.get("result")
-            if not isinstance(after_df, pd.DataFrame):
-                for v in local_vars.values():
-                    if isinstance(v, pd.DataFrame):
-                        after_df = v
-                        break
+            after_df = exec_res.get("_after_df")
             if isinstance(after_df, pd.DataFrame):
                 diff = diff_dataframes(df, after_df)
         except Exception:
@@ -127,8 +125,10 @@ async def process_query_v2(
             # bump hit marker for API layer
             _cached["_cache_hit"] = True
             return _cached
-    df = st.load_dataset_df(dataset_id)
-    profile = profile_dataframe(df)
+    import asyncio
+
+    df = await asyncio.to_thread(st.load_dataset_df, dataset_id)
+    profile = await asyncio.to_thread(profile_dataframe, df, 5, True, dataset_id, _version)
     if is_connector and not query.strip().lower().startswith(("select", "with")):
         # Inject hint so planner/coder treat as sql — preserve analytics intent
         ql = query.lower()
@@ -179,7 +179,7 @@ async def process_query_v2(
     code_res = await coder.generate_code(query, profile, intent)
     code = code_res["code"]
     code_exp = code_res.get("explanation", "")
-    exec_res = executor.execute_code(code, df)
+    exec_res = await asyncio.to_thread(executor.execute_code, code, df)
     insight = await explainer.explain(
         query,
         exec_res.get("result_json"),
@@ -194,25 +194,17 @@ async def process_query_v2(
         # create conversation file directly
     # Save user
     st.save_conversation_message(dataset_id, conversation_id, "user", {"query": query})
-    # Save assistant with diff for cleaning
+    # Save assistant with diff for cleaning — single exec (exec_res._after_df)
     diff = None
     if intent.get("intent") == "cleaning" and exec_res.get("success"):
         try:
             from app.core.wrangle import diff_dataframes
-            from app.core.security import get_safe_globals
-            import pandas as pd
 
-            safe_globals = get_safe_globals(df)
-            local_vars = {}
-            exec(code, safe_globals, local_vars)
-            after_df = local_vars.get("result")
-            if not isinstance(after_df, pd.DataFrame):
-                for v in local_vars.values():
-                    if isinstance(v, pd.DataFrame):
-                        after_df = v
-                        break
+            after_df = exec_res.get("_after_df")
             if isinstance(after_df, pd.DataFrame):
                 diff = diff_dataframes(df, after_df)
+            else:
+                diff = {"before_shape": list(df.shape), "changed": True}
         except Exception:
             diff = None
     assistant_content = {

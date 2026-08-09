@@ -97,6 +97,28 @@ def clear_prefix(prefix: str):
             _memory_times.pop(k, None)
 
 
+def delete(key: str):
+    r = _get_redis()
+    if r:
+        try:
+            r.delete(key)
+        except:
+            pass
+    _memory_cache.pop(key, None)
+    _memory_times.pop(key, None)
+
+
+def clear():
+    r = _get_redis()
+    if r:
+        try:
+            r.flushdb()
+        except:
+            pass
+    _memory_cache.clear()
+    _memory_times.clear()
+
+
 def cache_key(*parts) -> str:
     # hash long parts
     raw = "|".join(str(p) for p in parts)

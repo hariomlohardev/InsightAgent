@@ -10,8 +10,15 @@ from app.agent.executor import dataframe_to_json, fig_to_json
 
 async def preview_clean(dataset_id: str, query: str) -> Dict[str, Any]:
     """Preview cleaning without mutating. Returns diff, preview, code, etc."""
-    df = storage.load_dataset_df(dataset_id)
-    profile = profile_dataframe(df)
+    import asyncio
+
+    df = await asyncio.to_thread(storage.load_dataset_df, dataset_id)
+    try:
+        _meta = storage.get_dataset_meta(dataset_id)
+        _ver = _meta.get("current_version", 0) if _meta else 0
+    except:
+        _ver = 0
+    profile = await asyncio.to_thread(profile_dataframe, df, 5, True, dataset_id, _ver)
 
     # Generate code via coder (cleaning branch)
     # Force intent to cleaning for preview
@@ -38,8 +45,10 @@ async def preview_clean(dataset_id: str, query: str) -> Dict[str, Any]:
             "chart": None,
         }
 
-    # Execute on copy
-    exec_res = executor.execute_code(code, df)
+    # Execute once — capture after_df from executor
+    import asyncio as _asyncio
+
+    exec_res = await _asyncio.to_thread(executor.execute_code, code, df)
 
     if not exec_res["success"]:
         return {
@@ -53,34 +62,9 @@ async def preview_clean(dataset_id: str, query: str) -> Dict[str, Any]:
             "stdout": exec_res.get("stdout"),
         }
 
-    # Get result df from exec
-    # exec_res has result_json, but we need actual df for diff
-    # Re-execute to get actual df? Or we can reconstruct from result_json? Better to exec again and capture df
-    # For diff, we need before and after DataFrames
-    # We can get after df by executing code and capturing result variable
-    # Let's do a direct exec that captures result df
-    try:
-        # Use executor's safe globals to get after df
-        from app.core.security import get_safe_globals
-        import pandas as pd
-
-        safe_globals = get_safe_globals(df)
-        local_vars = {}
-        # Need to handle timeout and security already validated
-        exec(code, safe_globals, local_vars)
-        after_df = local_vars.get("result")
-        if not isinstance(after_df, pd.DataFrame):
-            # Try to find any DataFrame
-            for v in local_vars.values():
-                if isinstance(v, pd.DataFrame):
-                    after_df = v
-                    break
-            if not isinstance(after_df, pd.DataFrame):
-                # Fallback: use result_json to reconstruct? Just use df
-                after_df = df
-    except Exception as e:
+    after_df = exec_res.get("_after_df")
+    if not isinstance(after_df, pd.DataFrame):
         after_df = df
-        # Don't fail preview just because diff failed
 
     # Compute diff
     try:
@@ -121,8 +105,15 @@ async def preview_clean(dataset_id: str, query: str) -> Dict[str, Any]:
 
 async def apply_clean(dataset_id: str, query: str, code: str = None) -> Dict[str, Any]:
     """Apply cleaning: execute code, create new version, return new meta and diff."""
-    df = storage.load_dataset_df(dataset_id)
-    profile = profile_dataframe(df)
+    import asyncio
+
+    df = await asyncio.to_thread(storage.load_dataset_df, dataset_id)
+    try:
+        _meta2 = storage.get_dataset_meta(dataset_id)
+        _ver2 = _meta2.get("current_version", 0) if _meta2 else 0
+    except:
+        _ver2 = 0
+    profile = await asyncio.to_thread(profile_dataframe, df, 5, True, dataset_id, _ver2)
 
     if not code:
         # Generate code
@@ -133,7 +124,7 @@ async def apply_clean(dataset_id: str, query: str, code: str = None) -> Dict[str
     else:
         explanation = "Applied from preview"
 
-    # Validate and execute
+    # Validate and execute (single exec)
     from app.core.security import validate_code, SecurityError
 
     try:
@@ -141,7 +132,7 @@ async def apply_clean(dataset_id: str, query: str, code: str = None) -> Dict[str
     except SecurityError as e:
         return {"success": False, "error": f"Security violation: {str(e)}", "code": code}
 
-    exec_res = executor.execute_code(code, df)
+    exec_res = await asyncio.to_thread(executor.execute_code, code, df)
     if not exec_res["success"]:
         return {
             "success": False,
@@ -150,27 +141,13 @@ async def apply_clean(dataset_id: str, query: str, code: str = None) -> Dict[str
             "explanation": explanation,
         }
 
-    # Get after df
-    try:
-        from app.core.security import get_safe_globals
-
-        safe_globals = get_safe_globals(df)
-        local_vars = {}
-        exec(code, safe_globals, local_vars)
-        after_df = local_vars.get("result")
-        if not isinstance(after_df, pd.DataFrame):
-            for v in local_vars.values():
-                if isinstance(v, pd.DataFrame):
-                    after_df = v
-                    break
-            if not isinstance(after_df, pd.DataFrame):
-                return {
-                    "success": False,
-                    "error": "Cleaning did not produce a DataFrame",
-                    "code": code,
-                }
-    except Exception as e:
-        return {"success": False, "error": f"Failed to capture result: {str(e)}", "code": code}
+    after_df = exec_res.get("_after_df")
+    if not isinstance(after_df, pd.DataFrame):
+        return {
+            "success": False,
+            "error": "Cleaning did not produce a DataFrame",
+            "code": code,
+        }
 
     # Validate
     validation = validate_clean_result(df, after_df)
@@ -193,8 +170,13 @@ async def apply_clean(dataset_id: str, query: str, code: str = None) -> Dict[str
     diff = diff_dataframes(df, after_df)
     diff["validation"] = validation
 
-    # New profile
-    new_profile = profile_dataframe(after_df)
+    # New profile (version-aware)
+    try:
+        _meta_n = storage.get_dataset_meta(dataset_id)
+        _ver_n = _meta_n.get("current_version", 0) if _meta_n else 0
+    except:
+        _ver_n = 0
+    new_profile = await asyncio.to_thread(profile_dataframe, after_df, 5, True, dataset_id, _ver_n)
 
     return {
         "success": True,

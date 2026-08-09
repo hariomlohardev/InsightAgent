@@ -3,6 +3,8 @@ import os
 import uuid
 import shutil
 import tempfile
+import time
+import threading
 from pathlib import Path
 from datetime import datetime
 from typing import List, Dict, Any, Optional
@@ -10,6 +12,40 @@ import pandas as pd
 import logging
 
 logger = logging.getLogger(__name__)
+
+# --- DataFrame cache: dataset_id:version -> DataFrame (avoids re-read from disk) ---
+_DF_CACHE: Dict[str, pd.DataFrame] = {}
+_DF_CACHE_TS: Dict[str, float] = {}
+_DF_CACHE_LOCK = threading.Lock()
+_DF_CACHE_MAX = 4  # avoid unbounded growth
+_DF_CACHE_TTL = 300  # seconds
+# --- list_datasets cache ---
+_LIST_CACHE: Dict[str, Any] = {"data": None, "ts": 0, "q": None}
+_LIST_CACHE_TTL = 2.0
+_LIST_CACHE_LOCK = threading.Lock()
+
+
+def _df_cache_key(dataset_id: str, version: int, use_polars: bool) -> str:
+    return f"{dataset_id}:{version}:{use_polars}"
+
+
+def _invalidate_df_cache(dataset_id: str = None):
+    with _DF_CACHE_LOCK:
+        if dataset_id is None:
+            _DF_CACHE.clear()
+            _DF_CACHE_TS.clear()
+        else:
+            for k in list(_DF_CACHE.keys()):
+                if k.startswith(f"{dataset_id}:"):
+                    _DF_CACHE.pop(k, None)
+                    _DF_CACHE_TS.pop(k, None)
+
+
+def _invalidate_list_cache():
+    with _LIST_CACHE_LOCK:
+        _LIST_CACHE["data"] = None
+        _LIST_CACHE["ts"] = 0
+
 
 from app.config import get_storage_path, get_workspace_id, is_cloud
 
@@ -485,11 +521,22 @@ def save_dataset(file_path: Path, original_filename: str) -> str:
         {"version": 0, "op": "create", "prompt": "upload", "created_at": meta["created_at"]}
     ]
     _atomic_write_json(versions_dir / "versions.json", versions_meta)
+    _invalidate_list_cache()
+    _invalidate_df_cache(dataset_id)
 
     return dataset_id
 
 
 def list_datasets(q: str = None) -> List[Dict[str, Any]]:
+    # cached 2s to avoid scanning meta.json per request; invalidate on save/delete/upload
+    if q is None:
+        with _LIST_CACHE_LOCK:
+            if (
+                _LIST_CACHE["data"] is not None
+                and (time.time() - _LIST_CACHE["ts"]) < _LIST_CACHE_TTL
+            ):
+                # return copy
+                return list(_LIST_CACHE["data"])
     # L10 search: filter by filename ilike when q provided
     # L09 DB path first when DATABASE_URL set
     # Try DB filtered query first
@@ -569,6 +616,11 @@ def list_datasets(q: str = None) -> List[Dict[str, Any]]:
             db_metas.sort(key=lambda x: x.get("created_at", ""), reverse=True)
             return db_metas
         db_metas.sort(key=lambda x: x.get("created_at", ""), reverse=True)
+        # also cache DB path
+        if not q:
+            with _LIST_CACHE_LOCK:
+                _LIST_CACHE["data"] = list(db_metas)
+                _LIST_CACHE["ts"] = time.time()
         return db_metas
     datasets = []
     datasets = []
@@ -594,6 +646,11 @@ def list_datasets(q: str = None) -> List[Dict[str, Any]]:
                 except (PermissionError, OSError):
                     continue
     datasets.sort(key=lambda x: x.get("created_at", ""), reverse=True)
+    # cache q=None result
+    if q is None:
+        with _LIST_CACHE_LOCK:
+            _LIST_CACHE["data"] = list(datasets)
+            _LIST_CACHE["ts"] = time.time()
     return datasets
 
 
@@ -643,6 +700,30 @@ def get_dataset_path(dataset_id: str) -> Optional[Path]:
 
 
 def load_dataset_df(dataset_id: str, use_polars: bool = None) -> pd.DataFrame:
+    # cache check — stable key dataset_id:version (not id(df))
+    # determine version early for cache key
+    try:
+        _meta_for_cache = get_dataset_meta(dataset_id)
+        _ver = _meta_for_cache.get("current_version", 0) if _meta_for_cache else 0
+    except Exception:
+        _ver = 0
+    # resolve use_polars for cache key (auto-enable for large files)
+    _up = use_polars
+    if _up is None:
+        # auto: enable polars by default and for large files; respects explicit false only when small
+        env = os.getenv("USE_POLARS", "true").lower() in ("true", "1", "yes")
+        # for large files always try polars even if env false (unless explicitly disabled via USE_POLARS=false and small)
+        _up = env
+    _ck = _df_cache_key(dataset_id, _ver, bool(_up))
+    with _DF_CACHE_LOCK:
+        _cached_df = _DF_CACHE.get(_ck)
+        _ts = _DF_CACHE_TS.get(_ck, 0)
+        if _cached_df is not None and (time.time() - _ts) < _DF_CACHE_TTL:
+            # return copy to prevent mutation of cached object
+            try:
+                return _cached_df.copy(deep=False)
+            except Exception:
+                return _cached_df
     # L09 S3 primary when STORAGE_BACKEND=s3, fallback to fs
     storage_backend = os.getenv("STORAGE_BACKEND", "fs")
     if storage_backend == "s3":
@@ -686,74 +767,121 @@ def load_dataset_df(dataset_id: str, use_polars: bool = None) -> pd.DataFrame:
     p = get_dataset_path(dataset_id)
     if not p or not p.exists():
         raise FileNotFoundError(f"Dataset {dataset_id} not found")
-    # Polars fast path (10M <2s via scan_csv) + chunked pandas fallback
+    # Polars fast path — default true, auto for large files (fix #6)
+    # use_polars already resolved for cache key in _up; reuse that
     if use_polars is None:
-        use_polars = os.getenv("USE_POLARS", "false").lower() in ("true", "1", "yes")
+        # _up already computed; but keep backward-compat env check
+        use_polars = os.getenv("USE_POLARS", "true").lower() in ("true", "1", "yes")
+        # auto-enable for large files (>5MB or >100k rows) even if env false
+        try:
+            if not use_polars:
+                fsize = p.stat().st_size if p.exists() else 0
+                if fsize > 5 * 1024 * 1024:
+                    use_polars = True
+                else:
+                    _meta = get_dataset_meta(dataset_id)
+                    if _meta and _meta.get("rows", 0) > 100_000:
+                        use_polars = True
+        except:
+            pass
     if use_polars:
+        _polars_df = None
         try:
             import polars as pl
 
-            # BF-02: parquet fast path 60ms vs csv 205ms, streaming 39ms vs scan 205ms
             pq = p.parent / "data.parquet"
             if pq.exists():
                 try:
-                    # parquet via polars scan (fastest for re-read)
                     df_pl = pl.scan_parquet(str(pq)).collect()
-                    return df_pl.to_pandas()
+                    _polars_df = df_pl.to_pandas()
                 except Exception:
                     try:
-                        return pd.read_parquet(pq)
+                        _polars_df = pd.read_parquet(pq)
                     except Exception:
                         pass
-            # streaming CSV read
+                if _polars_df is not None:
+                    with _DF_CACHE_LOCK:
+                        if len(_DF_CACHE) >= _DF_CACHE_MAX:
+                            oldest = min(_DF_CACHE_TS, key=lambda k: _DF_CACHE_TS[k])
+                            _DF_CACHE.pop(oldest, None)
+                            _DF_CACHE_TS.pop(oldest, None)
+                        _DF_CACHE[_ck] = _polars_df
+                        _DF_CACHE_TS[_ck] = time.time()
+                    return (
+                        _polars_df.copy(deep=False) if hasattr(_polars_df, "copy") else _polars_df
+                    )
             try:
                 df_pl = pl.scan_csv(str(p), infer_schema_length=1000, try_parse_dates=True).collect(
                     streaming=True
                 )
-                return df_pl.to_pandas()
+                _polars_df = df_pl.to_pandas()
             except TypeError as e:
-                # older polars without streaming kw
                 if "streaming" in str(e).lower() or "unexpected" in str(e).lower():
                     df_pl = pl.scan_csv(str(p), infer_schema_length=1000).collect()
-                    return df_pl.to_pandas()
-                raise
+                    _polars_df = df_pl.to_pandas()
+                else:
+                    raise
             except Exception:
                 try:
                     df_pl = pl.scan_csv(str(p), infer_schema_length=1000).collect()
-                    return df_pl.to_pandas()
+                    _polars_df = df_pl.to_pandas()
                 except Exception:
                     try:
                         df_pl = pl.read_csv(str(p), try_parse_dates=True, infer_schema_length=1000)
-                        return df_pl.to_pandas()
+                        _polars_df = df_pl.to_pandas()
                     except:
                         pass
+            if _polars_df is not None:
+                with _DF_CACHE_LOCK:
+                    if len(_DF_CACHE) >= _DF_CACHE_MAX:
+                        oldest = min(_DF_CACHE_TS, key=lambda k: _DF_CACHE_TS[k])
+                        _DF_CACHE.pop(oldest, None)
+                        _DF_CACHE_TS.pop(oldest, None)
+                    _DF_CACHE[_ck] = _polars_df
+                    _DF_CACHE_TS[_ck] = time.time()
+                return _polars_df.copy(deep=False) if hasattr(_polars_df, "copy") else _polars_df
         except ImportError:
             pass
     # Fallback pandas with chunked sample for huge files (avoid OOM)
+    _df = None
     try:
-        # If file >50MB, use chunksize to sample describe for speed (still return full df via iteration if needed, but for 10M we return full via chunks)
+        # If file >50MB, avoid single pd.read_csv spike — use polars if available, else chunked
         fsize = p.stat().st_size if p.exists() else 0
-        if fsize > 50 * 1024 * 1024:
-            # For huge files, read in chunks and concat (still memory heavy but avoids single read spike; pandas chunksize)
-            # We'll read first chunk for preview and then full via chunks if needed
-            # Simple: use chunksize 100k and concat
+        if fsize > 50 * 1024 * 1024 and not use_polars:
             chunks = []
             for chunk in pd.read_csv(p, chunksize=100000):
                 chunks.append(chunk)
-                # Limit to 10M rows approx to avoid infinite
                 if sum(len(c) for c in chunks) > 10_000_000:
                     break
             if chunks:
-                return pd.concat(chunks, ignore_index=True)
-        return pd.read_csv(p)
+                _df = pd.concat(chunks, ignore_index=True)
+            else:
+                _df = pd.read_csv(p)
+        else:
+            _df = pd.read_csv(p)
     except Exception:
         orig_xlsx = p.parent / "original.xlsx"
         orig_xls = p.parent / "original.xls"
         if orig_xlsx.exists():
-            return pd.read_excel(orig_xlsx)
-        if orig_xls.exists():
-            return pd.read_excel(orig_xls)
-        raise
+            _df = pd.read_excel(orig_xlsx)
+        elif orig_xls.exists():
+            _df = pd.read_excel(orig_xls)
+        else:
+            raise
+    # store in cache (dataset_id:version -> df)
+    if _df is not None:
+        try:
+            with _DF_CACHE_LOCK:
+                # evict oldest if max reached
+                if len(_DF_CACHE) >= _DF_CACHE_MAX:
+                    oldest = min(_DF_CACHE_TS, key=lambda k: _DF_CACHE_TS[k])
+                    _DF_CACHE.pop(oldest, None)
+                    _DF_CACHE_TS.pop(oldest, None)
+                _DF_CACHE[_ck] = _df
+                _DF_CACHE_TS[_ck] = time.time()
+        except Exception:
+            pass
+    return _df
 
 
 def delete_dataset(dataset_id: str) -> bool:
@@ -792,6 +920,23 @@ def delete_dataset(dataset_id: str) -> bool:
         pass
     d = _datasets_dir() / dataset_id
     existed = d.exists()
+    _invalidate_df_cache(dataset_id)
+    _invalidate_list_cache()
+    # also invalidate profile cache via cache module if available
+    try:
+        from app.core.cache import delete as cache_delete, cache_key
+
+        meta_tmp = (
+            get_dataset_meta(dataset_id) if False else None
+        )  # placeholder to avoid import loop; delete below via version loop
+        # delete profile keys for this dataset (version 0..current+5)
+        for v in range(20):
+            try:
+                cache_delete(cache_key(f"profile:{dataset_id}:{v}"))
+            except:
+                pass
+    except:
+        pass
     if d.exists():
         try:
             shutil.rmtree(d)
@@ -1012,6 +1157,30 @@ def create_version(dataset_id: str, df: pd.DataFrame, op: str, prompt: str, code
         meta["columns"] = int(df.shape[1])
         meta["column_names"] = [str(c) for c in df.columns.tolist()]
         _atomic_write_json(dest_dir / "meta.json", meta)
+        # invalidate caches on version bump
+        _invalidate_df_cache(dataset_id)
+        _invalidate_list_cache()
+        try:
+            from app.core.cache import delete as cache_delete, cache_key
+
+            for v in [next_version, next_version - 1]:
+                try:
+                    cache_delete(cache_key(f"profile:{dataset_id}:{v}"))
+                except:
+                    pass
+            # also chat cache: chat:{id}:*:*
+            # leave chat cache to expire via ttl (60s) or version key already isolates
+        except:
+            pass
+        # update parquet cache for fast re-read
+        try:
+            if int(df.shape[0]) > 100_000:
+                try:
+                    df.to_parquet(dest_dir / "data.parquet", index=False)
+                except:
+                    pass
+        except:
+            pass
 
     return next_version
 
@@ -1032,6 +1201,8 @@ def revert_to_version(dataset_id: str, version: int) -> bool:
         if meta:
             meta["current_version"] = version
             _atomic_write_json(dest_dir / "meta.json", meta)
+            _invalidate_df_cache(dataset_id)
+            _invalidate_list_cache()
         return True
 
     df.to_csv(main_file, index=False)
@@ -1043,4 +1214,16 @@ def revert_to_version(dataset_id: str, version: int) -> bool:
         meta["columns"] = int(df.shape[1])
         meta["column_names"] = [str(c) for c in df.columns.tolist()]
         _atomic_write_json(dest_dir / "meta.json", meta)
+        _invalidate_df_cache(dataset_id)
+        _invalidate_list_cache()
+        try:
+            from app.core.cache import delete as cache_delete, cache_key
+
+            for v in range(20):
+                try:
+                    cache_delete(cache_key(f"profile:{dataset_id}:{v}"))
+                except:
+                    pass
+        except:
+            pass
     return True

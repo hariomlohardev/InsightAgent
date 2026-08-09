@@ -231,8 +231,8 @@ def upload_dataset(file):
 
 
 @st.cache_data(ttl=60, show_spinner=False)
-def get_dataset_details(dataset_id):
-    # 15s for details (profile can be 1.38s for 10M, but large/wide CSV may be >5s); health stays 1s for instant
+def _get_dataset_details_cached(dataset_id, version):
+    # version-aware cache key — avoids stale after apply-clean/revert
     for base in _backend_bases():
         try:
             r = _SESSION.get(f"{base}/api/datasets/{dataset_id}", timeout=15)
@@ -245,49 +245,121 @@ def get_dataset_details(dataset_id):
     return None
 
 
+def get_dataset_details(dataset_id):
+    # fetch current version (lightweight, 1.5s) to make cache version-aware without global clear
+    _ver = 0
+    try:
+        for base in _backend_bases():
+            try:
+                rv = _SESSION.get(f"{base}/api/datasets/{dataset_id}/versions", timeout=1.5)
+                if rv.status_code == 200:
+                    j = rv.json()
+                    _ver = j.get("current_version", 0) if isinstance(j, dict) else 0
+                    break
+            except:
+                continue
+        # fallback: if versions endpoint fails, try to infer from cached details quickly
+        if _ver == 0:
+            # try list_datasets version hint? keep 0
+            pass
+    except:
+        _ver = 0
+    return _get_dataset_details_cached(dataset_id, _ver)
+
+
 def chat_query(dataset_id, query, conv_id=None):
+    """Poll 202 queued job until completed/failed/timeout; never swallow NameError."""
     try:
         payload = {"dataset_id": dataset_id, "query": query, "conversation_id": conv_id}
         r = _SESSION.post(
             f"{BACKEND_URL}/api/chat", json=payload, headers=_auth_headers(), timeout=60
         )
-        # Queue polling for 202
-        if r.status_code == 202:
-            try:
-                j = r.json()
-                job_id = j.get("job_id")
-                if job_id:
-                    import time
+        if r.status_code != 202:
+            return r
+        # queued — poll jobs/{id}
+        try:
+            j = r.json()
+        except Exception:
+            return r  # malformed 202, surface as-is
+        job_id = j.get("job_id") if isinstance(j, dict) else None
+        if not job_id:
+            return r
+        import time
+        import json as _json
 
-                    with st.spinner(f"Job queued {job_id} — polling... (forecast/large)"):
-                        for _ in range(20):
-                            time.sleep(1)
-                            pr = _SESSION.get(
-                                f"{BACKEND_URL}/api/jobs/{job_id}",
-                                headers=_auth_headers(),
-                                timeout=5,
-                            )
-                            if pr.status_code == 200 and pr.json().get("status") == "completed":
-                                # fabricate response-like object with completed data
-                                class _R:
-                                    pass
+        with st.spinner(f"Job queued {job_id} — polling... (forecast/large)"):
+            for _ in range(20):
+                time.sleep(1)
+                try:
+                    pr = _SESSION.get(
+                        f"{BACKEND_URL}/api/jobs/{job_id}",
+                        headers=_auth_headers(),
+                        timeout=5,
+                    )
+                except Exception:
+                    continue
+                if pr.status_code != 200:
+                    continue
+                try:
+                    pj = pr.json()
+                except Exception:
+                    continue
+                if not isinstance(pj, dict):
+                    continue
+                status = pj.get("status")
+                if status == "completed":
+                    result = pj.get("result") or pj
+                    # result should be ChatResponse-shaped dict; tolerate wrapped
+                    if (
+                        isinstance(result, dict)
+                        and "result" in pj
+                        and isinstance(pj["result"], dict)
+                    ):
+                        result = pj["result"]
 
-                                rr = _R()
-                                rr.status_code = 200
-                                data = pr.json()
-                                # data already is result shape; ensure dataclass
-                                rr._json = data.get("result") or data
-                                rr.json = lambda d=data: d.get("result") or d
-                                rr.text = str(d)
-                                return rr
-                            elif pr.status_code == 200 and pr.json().get("status") == "failed":
-                                r.status_code = 500
-                                r.text = pr.json().get("error", "job failed")
-                                return r
-            except Exception:
-                pass
-        return r
+                    class _R:
+                        pass
+
+                    rr = _R()
+                    rr.status_code = 200
+                    rr._json = result
+                    rr.json = lambda d=result: d
+                    try:
+                        rr.text = _json.dumps(result)
+                    except Exception:
+                        rr.text = str(result)
+                    return rr
+                elif status == "failed":
+                    err = pj.get("error") or "job failed"
+
+                    class _F:
+                        pass
+
+                    fr = _F()
+                    fr.status_code = 500
+                    fr._json = {"detail": err, "status": "failed", "job_id": job_id}
+                    fr.json = lambda d=fr._json: d
+                    fr.text = str(err)
+                    return fr
+
+        # timeout — surface as 504 so caller can distinguish from 202/500
+        class _T:
+            pass
+
+        tr = _T()
+        tr.status_code = 504
+        tr._json = {"detail": "job polling timed out", "job_id": job_id}
+        tr.json = lambda d=tr._json: d
+        tr.text = _json.dumps(tr._json)
+        return tr
     except Exception as e:
+        # log unexpected, don't swallow
+        try:
+            import logging
+
+            logging.getLogger(__name__).exception("chat_query failed: %s", e)
+        except:
+            pass
         return None
 
 
@@ -485,8 +557,7 @@ if health:
         f"✅ Backend connected — v{health.get('version','0.1.0')} | {prov_text} | Storage: {root.get('storage','') if root else ''}"
     )
     with st.expander("🔌 LLM Providers — How to enable Groq / Gemini / Claude / Ollama"):
-        st.markdown(
-            """
+        st.markdown("""
         **InsightAgent works without any key** (heuristic fallback for 15+ queries). Add any key to `.env` for smarter insights:
         
         | Provider | Env | Get Key |
@@ -499,8 +570,7 @@ if health:
         
         Set `LLM_PROVIDER=auto` (default) — first available key wins. Or force: `LLM_PROVIDER=groq`.
         Restart backend after changing `.env` : `docker-compose up --build` or `uvicorn app.main:app --reload`.
-        """
-        )
+        """)
         if llm:
             st.json(llm)
 else:
@@ -696,8 +766,7 @@ if not datasets:
     st.info(
         "👋 **Welcome!** Upload a CSV/Excel file from the sidebar to start chatting with your data."
     )
-    st.markdown(
-        """
+    st.markdown("""
     **Try with sample data:**
     ```bash
     # sample_data/sales.csv is included (24 rows)
@@ -706,8 +775,7 @@ if not datasets:
 
     **LLM Providers:** Works without key! For smarter insights, add **Groq** (fastest, free) via `GROQ_API_KEY` in `.env`.
     See expander above for all 5 providers.
-    """
-    )
+    """)
     if os.path.exists("sample_data/sales.csv"):
         st.subheader("📄 Sample Data Preview: sales.csv")
         try:
