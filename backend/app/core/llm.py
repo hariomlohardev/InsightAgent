@@ -366,6 +366,9 @@ def _detect_provider() -> Optional[LLMProvider]:
     ).lower()
 
     # If explicit provider set, use it (even if key missing, will error and fallback)
+    # heuristic explicitly disables LLM — return None for fallback_coder
+    if provider_env == "heuristic":
+        return None
     if provider_env != "auto":
         if provider_env == "openai" and openai_key:
             model = (

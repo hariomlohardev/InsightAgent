@@ -201,8 +201,17 @@ def get_safe_globals(df):
 
     try:
         import duckdb
-    except ImportError:
-        duckdb = None
+    except Exception:
+        # Fallback mock that provides register/query interface so generated SQL code doesn't NameError
+        # when duckdb not installed (CI has it, local fallback uses df.query)
+        class _DuckDBFallback:
+            def register(self, *a, **k):
+                pass
+
+            def query(self, sql):
+                raise RuntimeError("duckdb not available — fallback to df.query")
+
+        duckdb = _DuckDBFallback()
 
     # Safe builtins - include __import__ for libraries (AST blocks user from using it with dangerous modules)
     # NOTE: getattr/hasattr intentionally NOT exposed (validate_code blocks them). Do not re-add.
@@ -229,6 +238,16 @@ def get_safe_globals(df):
         "isinstance": isinstance,
         "issubclass": issubclass,
         "__import__": __import__,
+        "Exception": Exception,
+        "BaseException": BaseException,
+        "ValueError": ValueError,
+        "TypeError": TypeError,
+        "KeyError": KeyError,
+        "IndexError": IndexError,
+        "RuntimeError": RuntimeError,
+        "AttributeError": AttributeError,
+        "NameError": NameError,
+        "ZeroDivisionError": ZeroDivisionError,
     }
 
     safe_globals = {
@@ -237,9 +256,8 @@ def get_safe_globals(df):
         "np": np,
         "px": px,
         "go": go,
+        "duckdb": duckdb,
     }
-    if duckdb is not None:
-        safe_globals["duckdb"] = duckdb
     # Analytics helpers (L5) — expose for code generation without needing import
     try:
         from app.core.analytics.why import analyze_why, what_if

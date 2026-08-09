@@ -33,8 +33,16 @@ def profile_dataframe(
                     str(id(df) % 100000),
                 )
             cached = cache_get(ck)
-            if cached:
-                return cached
+            if cached and isinstance(cached, dict):
+                # Validate that cached is a profile (not a dataset response polluted by old bug)
+                # Old bug cached full ProfileResponse under profile:{id}:{ver} — detect and ignore
+                if "dataset" in cached and "profile" in cached:
+                    # This is a dataset response, not a profile — treat as miss and recompute
+                    pass
+                elif "numeric_columns" in cached and "categorical_columns" in cached:
+                    return cached
+                elif "column_names" in cached and "inferred_roles" in cached:
+                    return cached
         except:
             pass
     # Guard empty df
@@ -76,7 +84,8 @@ def profile_dataframe(
                 str(c) for c in df.select_dtypes(include=[np.number]).columns.tolist()
             ],
             "categorical_columns": [
-                str(c) for c in df.select_dtypes(include=["object", "category"]).columns.tolist()
+                str(c)
+                for c in df.select_dtypes(include=["object", "category", "string"]).columns.tolist()
             ],
             "describe": {},
             "duplicates": 0,
@@ -152,7 +161,7 @@ def profile_dataframe(
             except Exception:
                 inferred_roles[str(col)] = "measure"
         # Categorical stats — BF-02 skip value_counts when unique >1000 (saves 270ms on high-cardinality date)
-        elif df[col].dtype == object or pd.api.types.is_categorical_dtype(df[col]):
+        elif df[col].dtype == object or pd.api.types.is_string_dtype(df[col]) or pd.api.types.is_categorical_dtype(df[col]):
             if 1 < unique < 1000:
                 try:
                     top_vals = df[col].value_counts(dropna=True).head(5).to_dict()
@@ -162,8 +171,14 @@ def profile_dataframe(
             else:
                 col_info["top_values"] = {}
 
-            # Datetime detection - only on object cols with date-like sample
-            if dtype == "object":
+            # Datetime detection - only on string-like cols with date-like sample (object/string/str in pandas 2/3)
+            # In pandas 3 dtype may be 'str' or 'string'; use is_string_dtype for robustness
+            is_str_like = False
+            try:
+                is_str_like = pd.api.types.is_string_dtype(df[col]) or dtype == "object"
+            except Exception:
+                is_str_like = dtype == "object" or "str" in dtype.lower()
+            if is_str_like:
                 try:
                     sample = df[col].dropna().head(5)
                     if len(sample) > 0:
@@ -177,13 +192,15 @@ def profile_dataframe(
                                 inferred_roles[str(col)] = "datetime"
                 except Exception:
                     pass
-            # Default role for object is dimension (if not already set as datetime)
+            # Default role for string-like is dimension (if not already set as datetime)
             if str(col) not in inferred_roles:
                 inferred_roles[str(col)] = "dimension"
         else:
-            # datetime etc
+            # datetime etc (pandas 3 string dtype -> dimension)
             inferred_roles[str(col)] = (
-                "dimension" if "object" in dtype or "category" in dtype else "measure"
+                "dimension"
+                if "object" in dtype or "category" in dtype or "string" in dtype.lower()
+                else "measure"
             )
 
         columns.append(col_info)
@@ -194,9 +211,14 @@ def profile_dataframe(
     except Exception:
         numeric_cols = []
     try:
-        categorical_cols = df.select_dtypes(include=["object", "category"]).columns.tolist()
+        # include string dtype for pandas 3.0
+        categorical_cols = df.select_dtypes(include=["object", "category", "string"]).columns.tolist()
     except Exception:
-        categorical_cols = []
+        # fallback without string if pandas <2
+        try:
+            categorical_cols = df.select_dtypes(include=["object", "category"]).columns.tolist()
+        except Exception:
+            categorical_cols = []
 
     # Try numeric describe, limit to 20 cols to avoid blowup on wide files
     try:

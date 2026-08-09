@@ -40,6 +40,12 @@ def _make_dashboard():
 
 
 def test_schedule_create_list_run_delete():
+    try:
+        import apscheduler  # noqa: F401
+    except ImportError:
+        import pytest
+
+        pytest.skip("apscheduler not installed")
     did, dash_id, wid = _make_dashboard()
     # create schedule
     r = client.post(
@@ -124,6 +130,12 @@ def test_schedule_create_list_run_delete():
 
 
 def test_exporter_pdf():
+    try:
+        import reportlab  # noqa: F401
+    except ImportError:
+        import pytest
+
+        pytest.skip("reportlab not installed")
     did, dash_id, wid = _make_dashboard()
     r = client.get(f"/api/dashboards/{dash_id}/export?format=pdf")
     assert r.status_code == 200
@@ -274,6 +286,12 @@ def test_comments():
 
 
 def test_reports():
+    try:
+        import reportlab  # noqa: F401
+    except ImportError:
+        import pytest
+
+        pytest.skip("reportlab not installed")
     did, dash_id, wid = _make_dashboard()
     # create report with markdown + widget
     r = client.post(
@@ -327,6 +345,12 @@ def test_reports():
 
 
 def test_schedule_threshold_and_both_channel():
+    try:
+        import apscheduler  # noqa: F401
+    except ImportError:
+        import pytest
+
+        pytest.skip("apscheduler not installed")
     did, dash_id, wid = _make_dashboard()
     # both channels
     r = client.post(

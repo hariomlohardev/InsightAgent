@@ -255,12 +255,12 @@ async def get_dataset(dataset_id: str, request: Request = None):
     meta = storage.get_dataset_meta(dataset_id)
     if not meta:
         raise HTTPException(status_code=404, detail="Dataset not found")
-    # Check cache for profile:version (10.2)
+    # Check cache for dataset response (distinct from profile cache profile:{id}:{ver})
     version = meta.get("current_version", 0)
     try:
         from app.core.cache import get as cache_get, set as cache_set, cache_key
 
-        ck = cache_key(f"profile:{dataset_id}:{version}")
+        ck = cache_key(f"dataset_resp:{dataset_id}:{version}")
         cached = cache_get(ck)
         if cached and isinstance(cached, dict) and "dataset" in cached:
             # Return cached with X-Cache header
@@ -281,11 +281,11 @@ async def get_dataset(dataset_id: str, request: Request = None):
             resp = ProfileResponse(
                 dataset=DatasetResponse(**meta), profile=profile, preview=preview
             )
-            # cache it
+            # cache it (dataset response, not profile)
             try:
                 from app.core.cache import set as cache_set, cache_key as ckf
 
-                ck = ckf(f"profile:{dataset_id}:{version}")
+                ck = ckf(f"dataset_resp:{dataset_id}:{version}")
                 cache_set(ck, resp.model_dump(), ttl=60)
             except:
                 pass
@@ -331,11 +331,11 @@ async def get_dataset(dataset_id: str, request: Request = None):
     resp_data = ProfileResponse(
         dataset=DatasetResponse(**meta), profile=profile, preview=preview
     ).model_dump()
-    # Cache and return with MISS
+    # Cache and return with MISS (dataset response)
     try:
         from app.core.cache import set as cache_set, cache_key as ckf
 
-        ck = ckf(f"profile:{dataset_id}:{version}")
+        ck = ckf(f"dataset_resp:{dataset_id}:{version}")
         cache_set(ck, resp_data, ttl=60)
     except:
         pass
