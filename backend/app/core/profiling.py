@@ -161,7 +161,11 @@ def profile_dataframe(
             except Exception:
                 inferred_roles[str(col)] = "measure"
         # Categorical stats — BF-02 skip value_counts when unique >1000 (saves 270ms on high-cardinality date)
-        elif df[col].dtype == object or pd.api.types.is_string_dtype(df[col]) or pd.api.types.is_categorical_dtype(df[col]):
+        elif (
+            df[col].dtype == object
+            or pd.api.types.is_string_dtype(df[col])
+            or pd.api.types.is_categorical_dtype(df[col])
+        ):
             if 1 < unique < 1000:
                 try:
                     top_vals = df[col].value_counts(dropna=True).head(5).to_dict()
@@ -212,7 +216,9 @@ def profile_dataframe(
         numeric_cols = []
     try:
         # include string dtype for pandas 3.0
-        categorical_cols = df.select_dtypes(include=["object", "category", "string"]).columns.tolist()
+        categorical_cols = df.select_dtypes(
+            include=["object", "category", "string"]
+        ).columns.tolist()
     except Exception:
         # fallback without string if pandas <2
         try:
