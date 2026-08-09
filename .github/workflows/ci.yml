@@ -100,6 +100,12 @@ jobs:
           # keep AUTH_REQUIRED=false CLOUD=false for OSS contributor frictionless (see CONTRIBUTING.md)
           AUTH_REQUIRED: "false"
           CLOUD: "false"
+          # disable external LLM in CI (heuristic fallback) to avoid 429/flaky
+          LLM_PROVIDER: "heuristic"
+          GROQ_API_KEY: ""
+          OPENAI_API_KEY: ""
+          GOOGLE_API_KEY: ""
+          ANTHROPIC_API_KEY: ""
         run: |
           cd backend
           pytest -q --tb=short --junitxml=../junit-backend-${{ matrix.python }}.xml

@@ -557,7 +557,8 @@ if health:
         f"✅ Backend connected — v{health.get('version','0.1.0')} | {prov_text} | Storage: {root.get('storage','') if root else ''}"
     )
     with st.expander("🔌 LLM Providers — How to enable Groq / Gemini / Claude / Ollama"):
-        st.markdown("""
+        st.markdown(
+            """
         **InsightAgent works without any key** (heuristic fallback for 15+ queries). Add any key to `.env` for smarter insights:
         
         | Provider | Env | Get Key |
@@ -570,7 +571,8 @@ if health:
         
         Set `LLM_PROVIDER=auto` (default) — first available key wins. Or force: `LLM_PROVIDER=groq`.
         Restart backend after changing `.env` : `docker-compose up --build` or `uvicorn app.main:app --reload`.
-        """)
+        """
+        )
         if llm:
             st.json(llm)
 else:
@@ -766,7 +768,8 @@ if not datasets:
     st.info(
         "👋 **Welcome!** Upload a CSV/Excel file from the sidebar to start chatting with your data."
     )
-    st.markdown("""
+    st.markdown(
+        """
     **Try with sample data:**
     ```bash
     # sample_data/sales.csv is included (24 rows)
@@ -775,7 +778,8 @@ if not datasets:
 
     **LLM Providers:** Works without key! For smarter insights, add **Groq** (fastest, free) via `GROQ_API_KEY` in `.env`.
     See expander above for all 5 providers.
-    """)
+    """
+    )
     if os.path.exists("sample_data/sales.csv"):
         st.subheader("📄 Sample Data Preview: sales.csv")
         try:
