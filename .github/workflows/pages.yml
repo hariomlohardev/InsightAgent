@@ -42,7 +42,7 @@ jobs:
           ls -lh /tmp/pages/ 2>&1 | head -n 30
           ls -lh /tmp/pages/docs/ 2>&1 | head -n 30
       - name: Upload artifact
-        uses: actions/upload-pages-artifact@v3
+        uses: actions/upload-pages-artifact@v5
         with:
           path: /tmp/pages
   deploy:
